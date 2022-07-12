@@ -1,0 +1,18 @@
+{% extends "layout.html" %} {% block content %}
+<div class="row">
+  <div class="col-6" id="notebook"></div>
+  <div class="col-6" id="simulator">
+    <div class="text-center pt-5" id="simulator-not-loaded">
+      <h2>Simulator not set up...</h2>
+      <p>
+        Run the Notebook on the left to start the simulator. Make sure the
+        logging level is at least <code>INFO</code>
+      </p>
+    </div>
+  </div>
+</div>
+
+{% endblock %} {% block scripts %}
+
+<script src="{{ url_for('static', filename='main.js') }}"></script>
+{% endblock %}

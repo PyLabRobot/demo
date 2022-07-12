@@ -1,0 +1,6 @@
+__pycache__
+*.DS_Store
+/pyhamilton-demo.db
+/instance
+.ipynb_checkpoints
+notes
