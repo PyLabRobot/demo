@@ -4,3 +4,4 @@ __pycache__
 /instance
 .ipynb_checkpoints
 notes
+/app/pyhamilton-demo.db

@@ -5,7 +5,15 @@ function hideSimulatorMessage() {
   message.style.display = "none";
 }
 
+function hideNotebookMessage() {
+  var message = document.getElementById("notebook-not-loaded");
+  message.style.display = "none";
+}
+
 function loadSimulator(simulator_iframe_url) {
+  if (document.getElementById("simulator-iframe")) {
+    document.getElementById("simulator-iframe").remove();
+  }
   var simulator = document.getElementById("simulator");
   var simulator_iframe = document.createElement("iframe");
   simulator_iframe.src = simulator_iframe_url;
@@ -15,11 +23,15 @@ function loadSimulator(simulator_iframe_url) {
 }
 
 function loadNotebook(notebook_iframe_url) {
+  if (document.getElementById("notebook-iframe")) {
+    document.getElementById("notebook-iframe").remove();
+  }
   var notebook = document.getElementById("notebook");
   var notebook_iframe = document.createElement("iframe");
   notebook_iframe.id = "notebook-iframe";
   notebook_iframe.src = notebook_iframe_url;
   notebook.appendChild(notebook_iframe);
+  hideNotebookMessage();
 }
 
 function getSession() {
