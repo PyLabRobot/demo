@@ -8,7 +8,7 @@ if __name__ == "__main__":
   email = input("email: ")
   password = input("Password: ")
 
-  user = User(email=email, password_hash=generate_password_hash(password))
+  user = User(email=email, password_hash=generate_password_hash(password).decode('utf-8'))
 
   db.session.add(user)
   try:

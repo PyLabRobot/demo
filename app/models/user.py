@@ -1,11 +1,17 @@
 from flask_login import UserMixin
 
 from app import db
+from app.models.base import Base
 
 
-class User(db.Model, UserMixin):
+class User(Base, UserMixin):
   __tablename__ = "users"
-  id = db.Column(db.Integer, primary_key=True)
-  password_hash = db.Column(db.String(80), nullable=False)
+  password_hash = db.Column(db.String(120), nullable=False)
   email = db.Column(db.String(80), unique=True, nullable=False)
   can_demo = db.Column(db.Boolean, default=False)
+
+  def serialize(self):
+    return {
+      **super().serialize(),
+      "email": self.email,
+    }
