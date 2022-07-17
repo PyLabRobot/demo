@@ -1,0 +1,8 @@
+{
+  "editor.tabSize": 2,
+  "files.trimTrailingWhitespace": true,
+  "python.linting.pylintEnabled": true,
+  "python.testing.autoTestDiscoverOnSaveEnabled": true,
+  "editor.rulers": [100],
+  "editor.formatOnSave": true
+}
