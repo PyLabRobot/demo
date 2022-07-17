@@ -1,0 +1,9 @@
+main {
+    max-width: 1000px;
+    margin: auto;
+}
+
+.platform .nav.flex-column {
+    height: calc(100vh - 50px);
+    overflow-y: scroll;
+}

@@ -17,7 +17,6 @@ SERVER_URL = "http://127.0.0.1:5000"
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]
-#app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///pyhamilton-demo.db"
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://localhost/pyhamilton"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["UPLOAD_DIR"] = "uploads"
@@ -59,7 +58,7 @@ def load_user(user_id): return User.query.get(user_id)
 def unauthorized():
   if request.headers.get("Content-Type") == "application/json":
     return jsonify({"error": "Unauthorized"}), 401
-  return redirect(url_for('site.login'))
+  return redirect(url_for('auth.login'))
 
 def start_background_loop(loop):
   asyncio.set_event_loop(loop)

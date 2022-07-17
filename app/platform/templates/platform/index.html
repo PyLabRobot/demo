@@ -1,0 +1,54 @@
+{% extends "layout.html" %} {% block head %}
+<link
+  rel="stylesheet"
+  href="{{ url_for('platform.static', filename='platform.css') }}"
+/>
+{% endblock%} {% block content %}
+
+<div class="platform row h-100">
+  <div class="col-md-2 border-end h-100 pe-0">
+    <div
+      class="nav flex-column nav-pills p-3"
+      id="v-pills-tab"
+      role="tablist"
+      aria-orientation="vertical"
+    >
+      <button
+        class="nav-link active"
+        id="v-pills-projects-tab"
+        data-bs-toggle="pill"
+        data-bs-target="#v-pills-projects"
+        type="button"
+        role="tab"
+        aria-controls="v-pills-projects"
+        aria-selected="true"
+      >
+        Projects
+      </button>
+    </div>
+  </div>
+  <div class="col-md-10">
+    <main class="tab-content p-3" id="v-pills-tabContent">
+      <div
+        class="tab-pane fade show active"
+        id="v-pills-projects"
+        role="tabpanel"
+        aria-labelledby="v-pills-projects-tab"
+        tabindex="0"
+      >
+        <h1>Projects</h1>
+        <ul>
+          {% for project in current_user.projects %}
+          <li>
+            <a href="{{ url_for('platform.get_project', id_=project.id) }}"
+              >{{ project.name }}</a
+            >
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </main>
+  </div>
+</div>
+
+{% endblock %}

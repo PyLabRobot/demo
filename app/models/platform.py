@@ -10,7 +10,7 @@ class Project(Base):
   name = db.Column(db.String(100), nullable=False)
 
   owner_id = db.Column(UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=False)
-  owner = db.relationship("User", backref=db.backref("proejcts", lazy=True))
+  owner = db.relationship("User", backref=db.backref("projects", lazy=True))
 
   def __repr__(self):
     return f"Project({self.name})"

@@ -2,7 +2,7 @@ import os
 
 import sqlalchemy
 
-from flask import render_template, request,jsonify, Blueprint, current_app, send_file
+from flask import render_template, request,jsonify, Blueprint, current_app, send_file, flash
 from flask_login import current_user, login_required
 import sqlalchemy
 from werkzeug.utils import secure_filename
@@ -10,10 +10,11 @@ from werkzeug.utils import secure_filename
 from app import db
 from app.models import File, Project
 
-platform = Blueprint("platform", __name__, url_prefix="/platform")
+platform = Blueprint("platform", __name__, url_prefix="/platform", template_folder="templates", static_folder="static")
 
 
 @platform.route("/")
+@login_required
 def index():
   return render_template("platform/index.html")
 
@@ -42,10 +43,22 @@ def get_project(id_):
     project = Project.query.get(id_)
   except sqlalchemy.exc.DataError as e:
     current_app.logger.error(e)
-    return jsonify({"error": "Malformed id"}), 400
+    if request.headers.get("Accept") == "application/json":
+      return jsonify({"error": "Malformed id"}), 400
+    else:
+      return render_template("error.html", error_code=400, title="Malformed id"), 500
+
   if project is None:
-    return jsonify({"error": "Project not found"}), 404
-  return jsonify(project.serialize())
+    if request.headers.get("Accept") == "application/json":
+      return jsonify({"error": "Project not found"}), 404
+    else:
+      flash("Project not found")
+      return render_template("error.html", error_code=404, title="Project not found"), 404
+
+  if request.headers.get("Accept") == "application/json":
+    return jsonify(project.serialize())
+  else:
+    return render_template("platform/project.html", project=project)
 
 
 ALLOWED_EXTENSIONS = {"txt", "tml", "lay", "ctr", "rck"}

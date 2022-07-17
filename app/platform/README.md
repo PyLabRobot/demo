@@ -37,7 +37,7 @@ curl -X POST --cookie cookie.txt localhost:5000/platform/projects -H "Content-Ty
 **Get a project by id**
 
 ```sh
-curl -X GET localhost:5000/platform/projects/f910b63e-de3f-49a4-bb53-5533cabd9450
+curl -X GET localhost:5000/platform/projects/f910b63e-de3f-49a4-bb53-5533cabd9450 -H "Accept: application/json"
 ```
 
 ```json

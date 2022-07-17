@@ -1,0 +1,65 @@
+{% extends "layout.html" %} {% block head %}
+<link
+  rel="stylesheet"
+  href="{{ url_for('platform.static', filename='platform.css') }}"
+/>
+{% endblock%} {% block content %}
+
+<div class="container project-page pt-3">
+  <h1 class="pb-2">{{ project.name }}</h1>
+  <p>By {{ project.owner.email }}</p>
+  <p>Created on {{ project.created_on.strftime('%Y-%m-%d') }}</p>
+
+  <ul class="nav nav-tabs" id="myTab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link active"
+        id="files-tab"
+        data-bs-toggle="tab"
+        data-bs-target="#files-tab-pane"
+        type="button"
+        role="tab"
+        aria-controls="files-tab-pane"
+        aria-selected="true"
+      >
+        Files
+      </button>
+    </li>
+  </ul>
+  <div class="tab-content" id="myTabContent">
+    <div
+      class="tab-pane fade show active"
+      id="files-tab-pane"
+      role="tabpanel"
+      aria-labelledby="files-tab"
+      tabindex="0"
+    >
+      {% if project.files|length > 0 %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Created On</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for file in project.files %}
+          <tr>
+            <td scope="row">
+              <a href="{{ url_for('platform.download_file', id_=file.id) }}"
+                >{{ file.name }}</a
+              >
+            </td>
+            <td>{{ file.created_on.strftime('%Y-%m-%d') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No files found</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
