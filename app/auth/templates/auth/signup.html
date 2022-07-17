@@ -1,0 +1,77 @@
+{% extends "layout.html" %} {% block content %}
+<div class="container sign-up" style="max-width: 800px">
+  <h1 class="my-3">Sign up for the PyHamilton Platform</h1>
+  <form action="{{ url_for('auth.signup') }}" method="post">
+    {{ form.hidden_tag() }}
+    <div class="row g-3 mb-3">
+      <div class="col">
+        <label for="first_name" class="form-label"
+          >{{ form.first_name.label }}</label
+        >
+        {{ form.first_name(class_='form-control' + (" is-invalid" if
+        form.first_name.errors else ""), placeholder='John') }} {% if
+        form.first_name.errors %} {% for error in form.first_name.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+        {% endfor %} {% endif %}
+      </div>
+      <div class="col">
+        <label for="last_name" class="form-label"
+          >{{ form.last_name.label }}</label
+        >
+        {{ form.last_name(class_='form-control' + (" is-invalid" if
+        form.last_name.errors else ""), placeholder='Doe') }} {% if
+        form.last_name.errors %} {% for error in form.last_name.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+        {% endfor %} {% endif %}
+      </div>
+    </div>
+
+    <label for="basic-url" class="form-label">Username</label>
+    <div class="input-group mb-3">
+      <span class="input-group-text"> phpm.pyhamilton.org/u/ </span>
+      {{ form.username(class_='form-control' + (" is-invalid" if
+      form.username.errors else ""), placeholder='john-doe-is-great') }} {% if
+      form.username.errors %} {% for error in form.username.errors %}
+      <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %} {% endif %}
+    </div>
+
+    <div class="mb-3">
+      <label for="activation_code" class="form-label"
+        >{{ form.activation_code.label }}</label
+      >
+      {{ form.activation_code(class_='form-control' + (" is-invalid" if
+      form.activation_code.errors else ""),
+      placeholder="f423ddb3-8d1c-4cec-abe3-3abf3d9b7a21") }} {% if
+      form.activation_code.errors %} {% for error in form.activation_code.errors
+      %}
+      <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %} {% endif %}
+
+      <small class="text-muted">
+        Request an activation code by contacting a PyHamilton team member.
+      </small>
+    </div>
+
+    <div class="mb-3">
+      <label for="email" class="form-label">{{ form.email.label }}</label>
+      {{ form.email(class_='form-control' + (" is-invalid" if form.email.errors
+      else ""), placeholder='you@company.com', type="email") }} {% if
+      form.email.errors %} {% for error in form.email.errors %}
+      <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %} {% endif %}
+    </div>
+
+    <div class="mb-3">
+      <label for="password" class="form-label">{{ form.password.label }}</label>
+      {{ form.password(class_='form-control' + (" is-invalid" if
+      form.password.errors else ""), type="password") }} {% if
+      form.password.errors %} {% for error in form.password.errors %}
+      <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %} {% endif %}
+    </div>
+
+    <button type="submit" class="btn btn-primary">Sign up</button>
+  </form>
+</div>
+{% endblock content %}

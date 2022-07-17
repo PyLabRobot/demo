@@ -1,11 +1,28 @@
-from flask import Blueprint, render_template, request, redirect, flash, url_for, jsonify
-from flask_bcrypt import check_password_hash
-from flask_login import login_user
+from flask import (
+  Blueprint,
+  render_template,
+  request,
+  redirect,
+  flash,
+  url_for,
+  jsonify,
+  current_app
+)
+from flask_bcrypt import check_password_hash, generate_password_hash
+from flask_login import login_user, logout_user
 
 from app import db
-from app.models import User
+from app.models import ActivationCode, User
 
-auth = Blueprint("auth", __name__, url_prefix="/auth")
+from .forms import SignUpForm
+
+auth = Blueprint(
+  "auth",
+  __name__,
+  url_prefix="/auth",
+  template_folder="templates",
+  static_folder="static"
+)
 
 
 @auth.route("/login", methods=["GET", "POST"])
@@ -32,4 +49,49 @@ def login():
     else:
       flash("Invalid email or password", "danger")
 
-  return render_template("login.html")
+  return render_template("auth/login.html")
+
+
+@auth.route("/signup", methods=["GET", "POST"])
+def signup():
+  form = SignUpForm()
+
+  if form.validate_on_submit():
+    first_name = form.first_name.data
+    last_name = form.last_name.data
+    activation_code = form.activation_code.data
+    username = form.username.data
+    email = form.email.data
+    password = form.password.data
+
+    password_hash = generate_password_hash(password).decode("utf-8")
+    user = User(
+      email=email,
+      password_hash=password_hash,
+      first_name=first_name,
+      last_name=last_name,
+      username=username,
+      activation_code=activation_code
+    )
+
+    db.session.add(user)
+    try:
+      db.session.commit()
+    except Exception as e:
+      db.session.rollback()
+      current_app.logger.error(e)
+      return jsonify({"error": "Could not sign up user"}), 500
+
+    login_user(user, remember=True)
+
+    return redirect(url_for("index"))
+  else:
+    print(form.errors)
+
+  return render_template("auth/signup.html", form=form)
+
+
+@auth.route("/logout")
+def logout():
+  logout_user()
+  return redirect(url_for("auth.login"))
