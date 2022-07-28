@@ -6,3 +6,6 @@ __pycache__
 notes
 /app/pyhamilton-demo.db
 *.swp
+
+secret_key.txt
+db_password.txt

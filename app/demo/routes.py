@@ -3,6 +3,7 @@ import json
 import functools
 import os
 import re
+from socket import getservbyname
 import requests
 import shutil
 import subprocess
@@ -11,6 +12,7 @@ import threading
 
 from flask import request, jsonify, session, url_for, redirect, Response, Blueprint, render_template, current_app
 from flask_login import current_user, login_required
+from simple_websocket import ConnectionClosed
 import websockets
 
 from app import (
@@ -26,13 +28,36 @@ from app import (
   loop,
   DEBUG_SINGLE_SESSION,
   PRINT,
-  SERVER_URL
+  SERVER_HOST
 )
-
-
 
 demo = Blueprint("demo", __name__)
 
+
+ips = {}
+def store_ip(uid, ip):
+  # store ip in database
+  ips[uid] = ip
+
+def get_ip_for_user(uid):
+  return ips[uid]
+
+# helper when not running in a cluster.
+nb = 8888
+sim = 2121
+fs = 1337
+
+def _get_nb_url_for_user(uid):
+  host = session_get("container_host")
+  return f"http://{host}:{nb}/"
+
+def _get_sim_url_for_user(uid):
+  host = session_get("container_host")
+  return f"http://{host}:{sim}/"
+
+def _get_fs_url_for_user(uid):
+  host = session_get("container_host")
+  return f"http://{host}:{fs}/"
 
 @demo.route("/")
 @login_required
@@ -56,11 +81,11 @@ def demo_required_ws(func):
   @functools.wraps(func)
   def wrapper(ws, *args, **kwargs):
     if not current_user.is_authenticated:
-      ws.send({"error": "You must be logged in to access this resource."})
+      ws.send(json.dumps({"error": "You must be logged in to access this resource.", "type": "error"}))
       ws.close()
       return
     if not current_user.can_demo:
-      ws.send({"error": "You don't have permission to access the demo."})
+      ws.send(json.dumps({"error": "You don't have permission to access the demo.", "type": "error"}))
       ws.close()
       return
     return func(ws, *args, **kwargs)
@@ -69,61 +94,10 @@ def demo_required_ws(func):
 
 @demo.route("/clean")
 def clean(): # For debug
-  sid = get_session_id()
-  if sid in ps:
-    for p in ps[sid]:
-      p.kill()
-      _ = p.communicate() # clear buffers
   session_clear()
   session.clear()
   return redirect(url_for("demo.index"))
 
-
-ps = {} # dict of processes ordered by session ID
-
-#PYTHON_PATH = "/home/web/demo/env/bin/python"
-PYTHON_PATH = "env/bin/python"
-# JUPYTER_CONFIG_FILE = "/home/web/demo/jupyter_notebook_config.py"
-JUPYTER_CONFIG_FILE = "jupyter_notebook_config.py"
-
-def spawn_notebook_process(notebook_dir):
-  if DEBUG_SINGLE_SESSION:
-    return 8888, "d81df88f0b9cce858eb74c4272ac17eb084915a0349d47ff"
-  notebook_p = subprocess.Popen(
-    [f"{PYTHON_PATH} -m jupyter notebook --config={JUPYTER_CONFIG_FILE} {notebook_dir}  --NotebookApp.allow_origin='*'"],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-    universal_newlines=True, shell=True,
-    env={"JUPYTER_CONFIG_DIR": "."})
-  matches = None
-  while (matches is None) and (notebook_p.poll() is None):
-    output = notebook_p.stderr.readline()
-    print("notebook read output: " + output, end="\r")
-    token_regex = r"http://localhost:(?P<port>[0-9]{4,5})/notebook/\?token=(?P<token>[a-f0-9]{48})"
-    matches = re.search(token_regex, output)
-    time.sleep(0.01)
-  port = matches.group("port")
-  token = matches.group("token")
-  ps[get_session_id()].append(notebook_p)
-  return port, token
-
-def spawn_kernel_gateway_process():
-  if DEBUG_SINGLE_SESSION:
-    return 8889
-  gateway_p = subprocess.Popen(
-    [f"{PYTHON_PATH} -m jupyter kernelgateway  --KernelGatewayApp.allow_origin='*'"],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-    universal_newlines=True, shell=True,
-    env={"KG_BASE_URL":"/notebook/"})
-  gateway_matches = None
-  while gateway_matches is None: # TODO: check if process is still running.
-    output = gateway_p.stderr.readline()
-    print("gateway read output: " + output, end="\r")
-    port_regex = r"Jupyter Kernel Gateway at http://127.0.0.1:(?P<port>[0-9]{4,5})"
-    gateway_matches = re.search(port_regex, output)
-    time.sleep(0.01)
-  gateway_port = gateway_matches.group("port")
-  ps[get_session_id()].append(gateway_p)
-  return gateway_port
 
 @login_required
 @demo.route("/get-session", methods=["GET"])
@@ -133,40 +107,27 @@ def get_session_id_api():
 def get_session():
   """ Get or create a session for the current user. """
 
+  # TODO: just return session id, have a ws action to actually request the start of the container,
+  # and send the response there.
+
   sid = get_session_id()
 
-  if session_has("notebook_host") and session_has("notebook_token") and session_has("gateway_port"):
-    token = session_get("notebook_token")
+  if not session_has("container_host") or True:
+    err = create_pod(current_user.id)
+    if err is not None:
+      return {"error": err, "type": "error"}
+    session_set("container_host", get_host_for_user(current_user.id))
+
+  if session_has("container_host"):
+    pass
   else:
-    user_dir = os.path.join(current_app.instance_path, USER_DIR, current_user.email)
+    session_set("container_host", get_host_for_user(current_user.id))
 
-    # Create user directory if it doesn't exist
-    if not os.path.exists(user_dir):
-      os.makedirs(user_dir)
+  iframe_url = f"/notebook/notebooks/notebook.ipynb"
 
-      # Create template notebook file
-      notebook_file = os.path.join(user_dir, "notebook.ipynb")
-      shutil.copy(TEMPLATE_FILE_PATH, notebook_file)
-
-    if sid not in ps:
-      ps[get_session_id()] = []
-
-    # launch a jupyter kernel for the user
-    port, token = spawn_notebook_process(user_dir)
-    gateway_port = spawn_kernel_gateway_process()
-
-    notebook_host = f"http://localhost:{port}/"
-
-    session_set("notebook_host", notebook_host)
-    session_set("notebook_token", token)
-    session_set("gateway_port", gateway_port)
-
-  iframe_url = f"/notebook/notebooks/notebook.ipynb?token={token}"
-
-  d = {"notebook_iframe_url": iframe_url, "session_id": get_session_id()}
+  d = {"notebook_iframe_url": iframe_url, "session_id": sid}
   if session_has("file_server_url"): d["simulator_url"] = url_for("demo.simulator_index")
   return d
-
 
 master_websocket_servers = {}
 
@@ -194,7 +155,6 @@ def master(ws):
       d.update(get_session())
       ws.send(json.dumps(d))
 
-
 ss = {}
 
 def get_requests_session():
@@ -210,6 +170,8 @@ def forward(url):
   """ Forward a request to {notebook, kernel gateway} server. """
   s = get_requests_session()
   requests.utils.add_dict_to_cookiejar(s.cookies, request.cookies) # needed? probably?
+  headers = {key: value for key, value in request.headers}# if key != 'Host'}
+  headers["X-Forwarded-Proto"] = "http"
   resp = s.request(
         method=request.method,
         url=url,
@@ -228,114 +190,191 @@ def forward(url):
 async def send_websocket_message(message, client):
   await client.send(message)
 
+def get_host_for_user(uid):
+  return f"nb-{uid}"
 
-@demo_required
+PRODUCTION = False
+
+def volume_exists(name):
+  out = subprocess.run(["docker", "volume", "ls"],
+    shell=True, universal_newlines=True, capture_output=True)
+  return name in out.stdout
+
+def container_exists(name):
+  out = subprocess.run(f"docker top {name}",
+    shell=True, universal_newlines=True, capture_output=True)
+  return not ("No such container" in out.stderr)
+
+def container_running(name):
+  out = subprocess.run("docker container inspect -f '{{.State.Running}}' %s" % name,
+    shell=True, universal_newlines=True, capture_output=True)
+  return out.stdout.strip() == "true"
+
+def create_pod(uid):
+  volume_name = f"user-{uid}-volume"
+
+  # Create user directory if it doesn't exist
+  if not volume_exists(volume_name):#not os.path.exists(user_dir):
+    print("creating volume", [f"docker", "volume", "create", volume_name])
+    out = subprocess.run(f"docker volume create {volume_name}", shell=True, universal_newlines=True, capture_output=True)
+    if out.returncode != 0:
+      return {"msg": "error creating volume", "err": out.stderr, "out": out.stdout}
+    out = [out.stderr, out.stdout]
+  else:
+    out = "out is None"
+
+  container_name = get_host_for_user(uid)
+
+  if container_exists(container_name):
+    if container_running(container_name):
+      return
+    p = subprocess.run(f"docker start {container_name}",
+      shell=True, universal_newlines=True, capture_output=True)
+    if p.returncode != 0:
+      return {"msg": "error starting existing container", "err": p.stderr, "out": p.stdout}
+  else:
+    # create container
+    sandbox = ""
+    resources = ""
+    if PRODUCTION:
+      ram = "512m"
+      cpu = 1
+      sandbox = "--runtime=runsc"
+      resources = f"-m {ram} --cpus={cpu}"
+
+    name = f"--name={container_name}"
+    network = "--net=demo_nbs"
+    hostname = f"--hostname={get_host_for_user(uid)}"
+    volume = f"-v {volume_name}:/nb-docker/notebooks:rw"
+    print("running", f"docker run {name} {resources} {sandbox} {network} {hostname} {volume} nb-simple")
+    p = subprocess.Popen(f"docker run {name} {resources} {sandbox} {network} {hostname} {volume} nb-simple",
+      shell=True, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    while True:
+      line = p.stderr.readline()
+      if line is not None and "is running at:" in line:
+        break
+      # line = p.stdout.readline()
+      # if line is not None and "is running at:" in line:
+      #   break
+      time.sleep(0.01)
+      print(line)
+
+  return None #["created volume", p.stderr, p.stdout, out]
+
+
 @demo.route("/notebook", defaults={"path": "/"}, methods=all_methods)
 @demo.route("/notebook/", defaults={"path": "/"}, methods=all_methods)
 @demo.route("/notebook/<path:path>", methods=all_methods)
+@demo_required
 def notebook(path):
-  gateway_port = session_get("gateway_port")
-  if gateway_port is None: return f"No gateway port (session {get_session_id()})", 500
-
-  if path == "api/kernelspecs" or path.startswith("api/kernels"):
-    # real gateway requests
-    forward_host = f"http://127.0.0.1:{gateway_port}/" # 127.0.0.1
-  elif path == "api/sessions" and request.method.lower() == "post":
-    # POST /sessions to the real gateway
-    forward_host = f"http://127.0.0.1:{gateway_port}/" # 127.0.0.1
-  else:
-    forward_host = session_get("notebook_host")
-
+  forward_host = _get_nb_url_for_user(current_user.id)
   request_url = request.url.replace(request.host_url, forward_host)
-
   return forward(request_url)
 
-notebook_ws_servers = {}
-notebook_clients_dict = {}
+websocket_clients = {}
+
+def mirror(ws, url, on_message=None):
+  if PRINT: print("#"*10, "connecting ws to", url)
+
+  # TODO: replace lock with client callback.
+  async def start_websocket_client(url, lock, ws):
+    print("@"*10, "connecting ws to", url)
+    async with websockets.connect(url) as client:
+      websocket_clients[get_session_id()] = client
+      lock.release()
+      print("@"*10, "connected ws to", url)
+
+      while True:
+        message = await client.recv()
+        if PRINT: print("<"*10, message)
+        ws.send(message)
+        if on_message is not None:
+          on_message(message, ws)
+
+  client_started_lock = threading.Lock()
+  client_started_lock.acquire()
+  asyncio.run_coroutine_threadsafe(start_websocket_client(url, client_started_lock, ws), loop)
+  while client_started_lock.locked():
+    time.sleep(0.1)
+
+  client = websocket_clients.get(get_session_id())
+  while True:
+    try:
+      message = ws.receive()
+      if PRINT: print(">"*10, message)
+      asyncio.run_coroutine_threadsafe(send_websocket_message(message, client), loop)
+    except ConnectionClosed:
+      if PRINT: print("#"*10, "connection closed")
+      break
+
+  # close client too
+  asyncio.run_coroutine_threadsafe(websocket_clients.get(get_session_id()).close(), loop)
+  websocket_clients.pop(get_session_id())
+
+
+def on_message(message, ws): # scan notebook output for simulation started command.
+  try:
+    data = json.loads(message)
+  except:
+    print("error parsing message", message)
+    data = None
+
+  try:
+    if data.get("msg_type") == "execute_result":
+      output = data["content"]["data"].get("text/plain")
+    elif data.get("msg_type") == "stream":
+      output = data["content"]["text"]
+    else:
+      output = None
+
+    print(output)
+  except:
+    print("whatever, blah")
+
+  if output is not None:
+    matches = re.search(r"Simulation server started at (?P<simulator_url>http://[a-zA-Z.0-9:/]+)", output)
+    if matches is not None:
+      # Store the simulator URL in the session and send it to the browser
+      simulator_url = matches.group("simulator_url") + "/"
+      simulator_url = simulator_url.replace("http://", "ws://")
+      session_set("simulator_url", simulator_url)
+    elif "Simulation server started at " in output:
+      # Debug message for regex, not really needed
+      print("No match for simulation server while output was:", output)
+    session_set("simulator_url", _get_sim_url_for_user(current_user.id))
+    print("Simulator URL:", session_get("simulator_url"))
+
+    # Store file server URL in the session
+    matches = re.search(r"File server started at (?P<file_server_url>http://[a-zA-Z.0-9:/]+)", output)
+    if matches is not None:
+      # Store the file serfver URL in the session and send it to the browser
+      # file_server_url = matches.group("file_server_url") + "/"
+      file_server_url = _get_fs_url_for_user(current_user.id)
+      session_set("file_server_url", file_server_url)
+      print("did find fsu", file_server_url)
+
+      mws = master_websocket_servers.get(get_session_id())
+      if mws is not None:
+        mws.send(json.dumps({
+          "type": "set-file-server",
+          "simulator_url": url_for("demo.simulator_index", path="/")
+        }))
+      else: print("mws is none with ", get_session_id())
+    elif "File server started at " in output:
+      # Debug message for regex, not really needed
+      print("No match for file server while output was:", output)
+
 
 @sock.route("/notebook/<path:path>")
 @demo_required_ws
 def notebook_ws(ws, path):
-  notebook_ws_servers[get_session_id()] = ws
-
   # Why does request.url have `http://` and not `ws://`? Requests are made to ws://
-  gateway_host = f"ws://localhost:{session_get('gateway_port')}/"
-  if DEBUG_SINGLE_SESSION:
-    gateway_host = f"ws://localhost:8889"
-  url = request.url.replace(SERVER_URL, gateway_host)
+  nb_url = _get_nb_url_for_user(get_session_id())
+  url = request.url.replace(SERVER_HOST, nb_url)
+  url = url.replace("http", "ws")
 
-  # forward websocket requests
-  client_started_lock = threading.Lock()
-  client_started_lock.acquire()
-  print("*"*20, "client url", url)
-  asyncio.run_coroutine_threadsafe(start_notebook_websocket_client(url, client_started_lock, ws), loop)
-  while client_started_lock.locked():
-    time.sleep(0.1)
-
-  # `sock` is the websocket server
-  while True:
-    message = ws.receive()
-    client = notebook_clients_dict.get(get_session_id())
-    if client:
-      asyncio.run_coroutine_threadsafe(send_websocket_message(message, client), loop)
-
-    if PRINT: print("<---", message)
-
-async def start_notebook_websocket_client(url, lock, ws):
-  async with websockets.connect(url) as client:
-    notebook_clients_dict[get_session_id()] = client
-    lock.release()
-
-    while True:
-      message = await client.recv()
-      if PRINT: print("--->", message)
-
-      #ws = notebook_ws_servers[get_session_id()]
-      ws.send(message)
-
-      # Intercept code output from the notebook
-      data = json.loads(message)
-
-      if data.get("msg_type") == "execute_result":
-        output = data["content"]["data"].get("text/plain")
-      elif data.get("msg_type") == "stream":
-        output = data["content"]["text"]
-      else:
-        output = None
-
-      if output is not None:
-        matches = re.search(r"Simulation server started at (?P<simulator_url>http://[a-zA-Z.0-9:/]+)", output)
-        if matches is not None:
-          # Store the simulator URL in the session and send it to the browser
-          simulator_url = matches.group("simulator_url") + "/"
-          simulator_url = simulator_url.replace("http://", "ws://")
-          session_set("simulator_url", simulator_url)
-        elif "Simulation server started at " in output:
-          # Debug message for regex, not really needed
-          print("No match for simulation server while output was:", output)
-
-        # Store file server URL in the session
-        matches = re.search(r"File server started at (?P<file_server_url>http://[a-zA-Z.0-9:/]+)", output)
-        if matches is not None:
-          # Store the file serfver URL in the session and send it to the browser
-          file_server_url = matches.group("file_server_url") + "/"
-          session_set("file_server_url", file_server_url)
-          print("did find fsu", file_server_url)
-
-          mws = master_websocket_servers.get(get_session_id())
-          if mws is not None:
-            mws.send(json.dumps({
-              "type": "set-file-server",
-              "simulator_url": url_for("demo.simulator_index", path="/")
-            }))
-          else: print("mws is none with ", get_session_id())
-        elif "File server started at " in output:
-          # Debug message for regex, not really needed
-          print("No match for file server while output was:", output)
-
-
-simulator_wss = {}
-simulator_clients = {}
+  return mirror(ws, url, on_message)
 
 @login_required
 @demo.route("/simulator", defaults={"path": "/"})
@@ -351,34 +390,8 @@ def simulator_ws(ws):
   if not "id" in session:
     return "no session", 400
 
-  simulator_wss[get_session_id()] = ws
-
   # Why does request.url have `http://` and not `ws://`?
-  url = session_get("simulator_url")
+  url = _get_sim_url_for_user(current_user.id)
+  url = url.replace("http", "ws")
 
-  # Lock until the client has started (which connects to the real simulator), before we accept
-  # any messages from our client (the browser).
-  client_started_lock = threading.Lock()
-  client_started_lock.acquire()
-  asyncio.run_coroutine_threadsafe(start_simulator_websocket_client(url, client_started_lock, ws), loop)
-  while client_started_lock.locked():
-    time.sleep(0.1)
-
-  while True:
-    message = ws.receive()
-    if PRINT: print("<---", message)
-
-    client = simulator_clients.get(get_session_id())
-    asyncio.run_coroutine_threadsafe(send_websocket_message(message, client), loop)
-
-async def start_simulator_websocket_client(url, lock, ws):
-  async with websockets.connect(url) as client:
-    lock.release()
-
-    simulator_clients[get_session_id()] = client
-    #ws = simulator_wss[get_session_id()]
-
-    while True:
-      message = await client.recv()
-      if PRINT: print("--->", message)
-      ws.send(message)
+  return mirror(ws, url)

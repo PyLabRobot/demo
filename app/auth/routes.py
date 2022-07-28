@@ -84,7 +84,7 @@ def signup():
 
     login_user(user, remember=True)
 
-    return redirect(url_for("index"))
+    return redirect(url_for("demo.index"))
   else:
     print(form.errors)
 

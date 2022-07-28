@@ -62,7 +62,10 @@ function startMasterWebsocket() {
     console.log("Received message from master websocket");
     console.log(event.data);
     var data = JSON.parse(event.data);
-    if (data.type === "set-session") {
+    if (data.type === "error") {
+      console.log(data.error);
+      alert(data.error);
+    } else if (data.type === "set-session") {
       loadNotebook(data.notebook_iframe_url);
 
       if (data.hasOwnProperty("simulator_url")) {

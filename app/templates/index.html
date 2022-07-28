@@ -1,6 +1,11 @@
 {% extends "layout.html" %} {% block content %}
 <div class="row">
-  <div class="col-6" id="notebook"></div>
+  <div class="col-6" id="notebook">
+    <div class="text-center pt-5" id="notebook-not-loaded">
+      <h2>Notebook loading...</h2>
+      <p>Please wait for about 20 seconds</p>
+    </div>
+  </div>
   <div class="col-6" id="simulator">
     <div class="text-center pt-5" id="simulator-not-loaded">
       <h2>Simulator not set up...</h2>

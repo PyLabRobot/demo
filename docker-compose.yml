@@ -1,0 +1,96 @@
+version: "3.9"
+
+services:
+  redis:
+    platform: linux/amd64
+    image: "redis:alpine"
+    networks:
+      - web
+    expose:
+      - 6379
+    volumes:
+      - cache:/data
+
+  db:
+    platform: linux/amd64
+    image: "postgres:alpine"
+    networks:
+      - web
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: "db"
+    expose:
+      - 5432
+    volumes:
+      - db:/var/lib/postgresql/data
+    secrets:
+      - db_password
+
+  web:
+    platform: linux/amd64
+    build: .
+    depends_on:
+      - redis
+      - db
+    expose:
+      - "5001"
+    networks:
+      - web
+      - nbs
+    deploy:
+      mode: replicated
+      replicas: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      VIRTUAL_HOST: "web.local"
+      USE_IP_HASH: 1 # doesn't work yet, so just use one replica
+
+      REDIS_HOST: "redis"
+      FLASK_ENV: "production"
+      DB_USER: "postgres"
+      DB_HOST: "db"
+      DB_NAME: "db"
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      SECRET_KEY_FILE: /run/secrets/secret_key
+
+      PYTHONUNBUFFERED: 1
+    secrets:
+      - db_password
+      - secret_key
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)"
+
+  nginx:
+    platform: linux/amd64
+    image: nginxproxy/nginx-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    depends_on:
+      - web
+    environment:
+      - DEFAULT_HOST=web.local
+    networks:
+      - web
+
+networks:
+  web:
+    driver: bridge
+  nbs:
+    driver: bridge
+
+secrets:
+  db_password:
+    file: db_password.txt
+  secret_key:
+    file: secret_key.txt
+
+volumes:
+  db:
+    driver: local
+  cache:
+    driver: local

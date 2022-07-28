@@ -10,14 +10,31 @@ from flask_sock import Sock
 from flask_sqlalchemy import SQLAlchemy
 import redis
 
-PRINT = False
+PRINT = True
 
-SERVER_URL = "http://127.0.0.1:5000"
+SERVER_HOST = "http://localhost/"
 
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://localhost/pyhamilton"
+if "SECRET_KEY" in os.environ:
+  app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]
+elif "SECRET_KEY_FILE" in os.environ:
+  with open(os.environ["SECRET_KEY_FILE"]) as f:
+    app.config["SECRET_KEY"] = f.read()
+else:
+  raise Exception("No secret key specified")
+
+db_host = os.environ["DB_HOST"]
+db_user = os.environ["DB_USER"]
+db_name = os.environ["DB_NAME"]
+if "DB_PASS" in os.environ:
+  db_pass = os.environ["DB_PASS"]
+elif "DB_PASSWORD_FILE" in os.environ:
+  with open(os.environ["DB_PASSWORD_FILE"]) as f:
+    db_pass = f.read()
+else:
+  raise Exception("No database password specified")
+app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{db_user}:{db_pass}@{db_host}/{db_name}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["UPLOAD_DIR"] = "uploads"
 app.url_map.strict_slashes = False
@@ -41,7 +58,8 @@ def get_session_id():
   return session["id"]
 
 # thread safe session
-redis_client = redis.StrictRedis(host="localhost", port=6379, db=0, decode_responses=True)
+redis_host = os.environ.get("REDIS_HOST", "localhost")
+redis_client = redis.StrictRedis(host=redis_host, port=6379, db=0, decode_responses=True)
 def _redis_key(key): return f"demo.{get_session_id()}.{key}"
 def session_set(key, value): redis_client.set(_redis_key(key), value)
 def session_get(key): return redis_client.get(_redis_key(key))
