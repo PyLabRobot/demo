@@ -10,6 +10,7 @@ services:
       - 6379
     volumes:
       - cache:/data
+    mem_reservation: 128m
 
   db:
     platform: linux/amd64
@@ -24,6 +25,7 @@ services:
       - 5432
     volumes:
       - db:/var/lib/postgresql/data
+    mem_reservation: 128m
     secrets:
       - db_password
 
@@ -44,7 +46,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      VIRTUAL_HOST: "web.local"
+      VIRTUAL_HOST: "simulator.pylabrobot.org"
+      LETSENCRYPT_HOST: "simulator.pylabrobot.org"
       USE_IP_HASH: 1 # doesn't work yet, so just use one replica
 
       REDIS_HOST: "redis"
@@ -59,16 +62,19 @@ services:
     secrets:
       - db_password
       - secret_key
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)"
+    mem_reservation: 128m
 
   nginx:
     platform: linux/amd64
     image: nginxproxy/nginx-proxy
     ports:
       - "80:80"
+      - "443:443"
     volumes:
+      - conf:/etc/nginx/conf.d
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - certs:/etc/nginx/certs:ro
       - /var/run/docker.sock:/tmp/docker.sock:ro
     depends_on:
       - web
@@ -76,12 +82,27 @@ services:
       - DEFAULT_HOST=web.local
     networks:
       - web
+    mem_reservation: 128m
+
+  acme-companion:
+    image: nginxproxy/acme-companion
+    container_name: nginx-proxy-acme
+    environment:
+      - DEFAULT_EMAIL=rick@pylabrobot.org
+    volumes_from:
+      - nginx
+    volumes:
+      - certs:/etc/nginx/certs:rw
+      - acme:/etc/acme.sh
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    network_mode: bridge
 
 networks:
   web:
     driver: bridge
   nbs:
     driver: bridge
+    internal: true
 
 secrets:
   db_password:
@@ -94,3 +115,8 @@ volumes:
     driver: local
   cache:
     driver: local
+  conf:
+  vhost:
+  html:
+  certs:
+  acme:

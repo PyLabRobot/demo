@@ -52,7 +52,7 @@ function getSession() {
 }
 
 function startMasterWebsocket() {
-  ws = new WebSocket(`ws://${window.location.host}/master`);
+  ws = new WebSocket(`wss://${window.location.host}/master`);
   ws.onopen = function () {
     console.log("Connected to master websocket");
     getSession();

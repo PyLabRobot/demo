@@ -12,7 +12,7 @@ import redis
 
 PRINT = True
 
-SERVER_HOST = "http://localhost/"
+SERVER_HOST = "http://simulator.pylabrobot.org/"
 
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -31,7 +31,7 @@ if "DB_PASS" in os.environ:
   db_pass = os.environ["DB_PASS"]
 elif "DB_PASSWORD_FILE" in os.environ:
   with open(os.environ["DB_PASSWORD_FILE"]) as f:
-    db_pass = f.read()
+    db_pass = f.read()[:-1] # remove new line character
 else:
   raise Exception("No database password specified")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{db_user}:{db_pass}@{db_host}/{db_name}"
@@ -48,14 +48,13 @@ sock = Sock(app)
 USER_DIR = "user_data"
 TEMPLATE_FILE_PATH = os.path.join(os.path.dirname(__file__), "notebook.ipynb")
 
-DEBUG_SINGLE_SESSION = True
+DEBUG_SINGLE_SESSION = False
 
 
 def get_session_id():
   """ Get the session ID, creating one if it doesn't exist. This is in a cookie. """
   if DEBUG_SINGLE_SESSION: session['id'] = 'f423ddb3-8d1c-4cec-abe3-3abf3d9b7a21'
-  if "id" not in session: session["id"] = str(uuid.uuid4())
-  return session["id"]
+  return str(current_user.id)
 
 # thread safe session
 redis_host = os.environ.get("REDIS_HOST", "localhost")
@@ -97,3 +96,4 @@ from app.platform import platform
 app.register_blueprint(platform)
 
 db.create_all()
+

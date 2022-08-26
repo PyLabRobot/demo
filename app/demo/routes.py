@@ -237,7 +237,7 @@ def create_pod(uid):
     sandbox = ""
     resources = ""
     if PRODUCTION:
-      ram = "512m"
+      ram = "1024m"
       cpu = 1
       sandbox = "--runtime=runsc"
       resources = f"-m {ram} --cpus={cpu}"
@@ -247,7 +247,9 @@ def create_pod(uid):
     hostname = f"--hostname={get_host_for_user(uid)}"
     volume = f"-v {volume_name}:/nb-docker/notebooks:rw"
     print("running", f"docker run {name} {resources} {sandbox} {network} {hostname} {volume} nb-simple")
-    p = subprocess.Popen(f"docker run {name} {resources} {sandbox} {network} {hostname} {volume} nb-simple",
+    cmd = f"docker run {name} {resources} {sandbox} {network} {hostname} {volume} nb-simple"
+    print(cmd)
+    p = subprocess.Popen(cmd,
       shell=True, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     while True:
@@ -258,7 +260,10 @@ def create_pod(uid):
       # if line is not None and "is running at:" in line:
       #   break
       time.sleep(0.01)
-      print(line)
+      print("line:", line)
+      if "docker: Error" in line:
+        # TODO: proper error handling, but a little is better than nothing.
+        return line
 
   return None #["created volume", p.stderr, p.stdout, out]
 
@@ -328,7 +333,7 @@ def on_message(message, ws): # scan notebook output for simulation started comma
     else:
       output = None
 
-    print(output)
+    print("output:", output)
   except:
     print("whatever, blah")
 
@@ -337,7 +342,7 @@ def on_message(message, ws): # scan notebook output for simulation started comma
     if matches is not None:
       # Store the simulator URL in the session and send it to the browser
       simulator_url = matches.group("simulator_url") + "/"
-      simulator_url = simulator_url.replace("http://", "ws://")
+      simulator_url = simulator_url.replace("http://", "wss://")
       session_set("simulator_url", simulator_url)
     elif "Simulation server started at " in output:
       # Debug message for regex, not really needed
@@ -382,16 +387,18 @@ def notebook_ws(ws, path):
 def simulator_index(path):
   file_server_url = session_get("file_server_url")
   request_url = request.url.replace(request.host_url, file_server_url).replace("/simulator", "")
+  print(file_server_url, request.host_url, request_url)
   return forward(request_url)
 
-@sock.route("/simulator")
+@sock.route("/simulator-ws")
 @demo_required_ws
 def simulator_ws(ws):
-  if not "id" in session:
-    return "no session", 400
-
   # Why does request.url have `http://` and not `ws://`?
   url = _get_sim_url_for_user(current_user.id)
+  print("sim url for user:", url)
+  print(1000*"sim url for user:", url)
   url = url.replace("http", "ws")
+  url = url.replace("-ws", "")
 
   return mirror(ws, url)
+
