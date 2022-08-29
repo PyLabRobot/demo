@@ -1,18 +1,21 @@
 import asyncio
 import os
 import threading
-import uuid
 
-from flask import Flask, request, jsonify, render_template, session, url_for, redirect, flash, Response
-from flask_bcrypt import Bcrypt, check_password_hash
-from flask_login import LoginManager, current_user, login_required, login_user, UserMixin
+from flask import Flask, request, jsonify, session, url_for, redirect
+from flask_bcrypt import Bcrypt
+from flask_login import LoginManager, current_user
 from flask_sock import Sock
 from flask_sqlalchemy import SQLAlchemy
 import redis
+from rq import Queue
 
 PRINT = True
-
-SERVER_HOST = "http://simulator.pylabrobot.org/"
+PRODUCTION = False
+if PRODUCTION:
+  SERVER_HOST = "http://simulator.pylabrobot.org/"
+else:
+  SERVER_HOST = "http://0.0.0.0:5001/"
 
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -31,7 +34,9 @@ if "DB_PASS" in os.environ:
   db_pass = os.environ["DB_PASS"]
 elif "DB_PASSWORD_FILE" in os.environ:
   with open(os.environ["DB_PASSWORD_FILE"]) as f:
-    db_pass = f.read()[:-1] # remove new line character
+    db_pass = f.read()
+  if PRODUCTION: # NOTE: this only seems to happen in production
+    db_pass = db_pass[:-1] # remove new line character
 else:
   raise Exception("No database password specified")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{db_user}:{db_pass}@{db_host}/{db_name}"
@@ -66,6 +71,8 @@ def session_has(key): return redis_client.exists(_redis_key(key))
 def session_clear():
   for k in redis_client.scan_iter(f"demo.{get_session_id()}"): redis_client.delete(k)
 
+q = Queue(connection=redis_client)
+
 from app.models import *
 
 @login_manager.user_loader
@@ -96,4 +103,3 @@ from app.platform import platform
 app.register_blueprint(platform)
 
 db.create_all()
-

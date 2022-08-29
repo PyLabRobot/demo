@@ -46,12 +46,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      VIRTUAL_HOST: "simulator.pylabrobot.org"
-      LETSENCRYPT_HOST: "simulator.pylabrobot.org"
-      USE_IP_HASH: 1 # doesn't work yet, so just use one replica
-
       REDIS_HOST: "redis"
-      FLASK_ENV: "production"
       DB_USER: "postgres"
       DB_HOST: "db"
       DB_NAME: "db"
@@ -64,38 +59,35 @@ services:
       - secret_key
     mem_reservation: 128m
 
-  nginx:
+  worker:
     platform: linux/amd64
-    image: nginxproxy/nginx-proxy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - conf:/etc/nginx/conf.d
-      - vhost:/etc/nginx/vhost.d
-      - html:/usr/share/nginx/html
-      - certs:/etc/nginx/certs:ro
-      - /var/run/docker.sock:/tmp/docker.sock:ro
+    build:
+      context: ./
+      dockerfile: ./worker/Dockerfile
     depends_on:
-      - web
-    environment:
-      - DEFAULT_HOST=web.local
+      - redis
+    deploy:
+      mode: replicated
+      replicas: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - web
-    mem_reservation: 128m
-
-  acme-companion:
-    image: nginxproxy/acme-companion
-    container_name: nginx-proxy-acme
+    mem_reservation: 64m
+    secrets:
+      - db_password
+      - secret_key
     environment:
-      - DEFAULT_EMAIL=rick@pylabrobot.org
-    volumes_from:
-      - nginx
-    volumes:
-      - certs:/etc/nginx/certs:rw
-      - acme:/etc/acme.sh
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    network_mode: bridge
+      REDIS_HOST: "redis"
+
+      FLASK_ENV: "development"
+      DB_USER: "postgres"
+      DB_HOST: "db"
+      DB_NAME: "db"
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      SECRET_KEY_FILE: /run/secrets/secret_key
+
+      PYTHONUNBUFFERED: 1
 
 networks:
   web:
@@ -115,8 +107,3 @@ volumes:
     driver: local
   cache:
     driver: local
-  conf:
-  vhost:
-  html:
-  certs:
-  acme:

@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  web:
+    environment:
+      VIRTUAL_HOST: "simulator.pylabrobot.org"
+      LETSENCRYPT_HOST: "simulator.pylabrobot.org"
+      USE_IP_HASH: 1 # doesn't work yet, so just use one replica
+
+      FLASK_ENV: "production"
+    ports: []
+
+  nginx:
+    platform: linux/amd64
+    image: nginxproxy/nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - conf:/etc/nginx/conf.d
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - certs:/etc/nginx/certs:ro
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    depends_on:
+      - web
+    environment:
+      - DEFAULT_HOST=web.local
+    networks:
+      - web
+    mem_reservation: 128m
+
+  acme-companion:
+    image: nginxproxy/acme-companion
+    container_name: nginx-proxy-acme
+    environment:
+      - DEFAULT_EMAIL=rick@pylabrobot.org
+    volumes_from:
+      - nginx
+    volumes:
+      - certs:/etc/nginx/certs:rw
+      - acme:/etc/acme.sh
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    network_mode: bridge
+
+volumes:
+  conf:
+  vhost:
+  html:
+  certs:
+  acme:

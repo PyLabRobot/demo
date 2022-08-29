@@ -1,14 +1,11 @@
 import asyncio
 import json
 import functools
-import os
 import re
-from socket import getservbyname
 import requests
-import shutil
-import subprocess
 import time
 import threading
+import urllib
 
 from flask import request, jsonify, session, url_for, redirect, Response, Blueprint, render_template, current_app
 from flask_login import current_user, login_required
@@ -16,31 +13,24 @@ from simple_websocket import ConnectionClosed
 import websockets
 
 from app import (
-  db,
   get_session_id,
   session_has,
   session_get,
   session_set,
   session_clear,
   sock,
-  USER_DIR,
-  TEMPLATE_FILE_PATH,
   loop,
-  DEBUG_SINGLE_SESSION,
   PRINT,
-  SERVER_HOST
+  SERVER_HOST,
+  PRODUCTION
+)
+from app.lib import (
+  create_pod,
+  container_running,
+  run_pod
 )
 
 demo = Blueprint("demo", __name__)
-
-
-ips = {}
-def store_ip(uid, ip):
-  # store ip in database
-  ips[uid] = ip
-
-def get_ip_for_user(uid):
-  return ips[uid]
 
 # helper when not running in a cluster.
 nb = 8888
@@ -62,7 +52,13 @@ def _get_fs_url_for_user(uid):
 @demo.route("/")
 @login_required
 def index():
-  return render_template("index.html")
+  if PRODUCTION:
+    protocol = "wss"
+  else:
+    protocol = "ws"
+  server_host = SERVER_HOST.replace("http", protocol) # TODO: SERVER_HOST should not include http.
+  master_web_socket_url = urllib.parse.urljoin(server_host, "/master")
+  return render_template("index.html", master_web_socket_url=master_web_socket_url)
 
 
 def demo_required(func):
@@ -109,19 +105,21 @@ def get_session():
 
   # TODO: just return session id, have a ws action to actually request the start of the container,
   # and send the response there.
+  # This is to save time on the request.
 
   sid = get_session_id()
+  err = create_pod(sid) # Create_pod checks if pod exists, and if not, creates it.
+  if err is not None:
+    return {"error": err, "type": "error"}
 
-  if not session_has("container_host") or True:
-    err = create_pod(current_user.id)
-    if err is not None:
-      return {"error": err, "type": "error"}
-    session_set("container_host", get_host_for_user(current_user.id))
-
-  if session_has("container_host"):
-    pass
+  print("*"*10, "get_session", sid)
+  if not container_running(sid):
+    print("run pod")
+    run_pod(sid)
   else:
-    session_set("container_host", get_host_for_user(current_user.id))
+    print("is running?", sid)
+
+  session_set("container_host", get_host_for_user(current_user.id))
 
   iframe_url = f"/notebook/notebooks/notebook.ipynb"
 
@@ -192,81 +190,6 @@ async def send_websocket_message(message, client):
 
 def get_host_for_user(uid):
   return f"nb-{uid}"
-
-PRODUCTION = False
-
-def volume_exists(name):
-  out = subprocess.run(["docker", "volume", "ls"],
-    shell=True, universal_newlines=True, capture_output=True)
-  return name in out.stdout
-
-def container_exists(name):
-  out = subprocess.run(f"docker top {name}",
-    shell=True, universal_newlines=True, capture_output=True)
-  return not ("No such container" in out.stderr)
-
-def container_running(name):
-  out = subprocess.run("docker container inspect -f '{{.State.Running}}' %s" % name,
-    shell=True, universal_newlines=True, capture_output=True)
-  return out.stdout.strip() == "true"
-
-def create_pod(uid):
-  volume_name = f"user-{uid}-volume"
-
-  # Create user directory if it doesn't exist
-  if not volume_exists(volume_name):#not os.path.exists(user_dir):
-    print("creating volume", [f"docker", "volume", "create", volume_name])
-    out = subprocess.run(f"docker volume create {volume_name}", shell=True, universal_newlines=True, capture_output=True)
-    if out.returncode != 0:
-      return {"msg": "error creating volume", "err": out.stderr, "out": out.stdout}
-    out = [out.stderr, out.stdout]
-  else:
-    out = "out is None"
-
-  container_name = get_host_for_user(uid)
-
-  if container_exists(container_name):
-    if container_running(container_name):
-      return
-    p = subprocess.run(f"docker start {container_name}",
-      shell=True, universal_newlines=True, capture_output=True)
-    if p.returncode != 0:
-      return {"msg": "error starting existing container", "err": p.stderr, "out": p.stdout}
-  else:
-    # create container
-    sandbox = ""
-    resources = ""
-    if PRODUCTION:
-      ram = "1024m"
-      cpu = 1
-      sandbox = "--runtime=runsc"
-      resources = f"-m {ram} --cpus={cpu}"
-
-    name = f"--name={container_name}"
-    network = "--net=demo_nbs"
-    hostname = f"--hostname={get_host_for_user(uid)}"
-    volume = f"-v {volume_name}:/nb-docker/notebooks:rw"
-    print("running", f"docker run {name} {resources} {sandbox} {network} {hostname} {volume} nb-simple")
-    cmd = f"docker run {name} {resources} {sandbox} {network} {hostname} {volume} nb-simple"
-    print(cmd)
-    p = subprocess.Popen(cmd,
-      shell=True, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    while True:
-      line = p.stderr.readline()
-      if line is not None and "is running at:" in line:
-        break
-      # line = p.stdout.readline()
-      # if line is not None and "is running at:" in line:
-      #   break
-      time.sleep(0.01)
-      print("line:", line)
-      if "docker: Error" in line:
-        # TODO: proper error handling, but a little is better than nothing.
-        return line
-
-  return None #["created volume", p.stderr, p.stdout, out]
-
 
 @demo.route("/notebook", defaults={"path": "/"}, methods=all_methods)
 @demo.route("/notebook/", defaults={"path": "/"}, methods=all_methods)
@@ -401,4 +324,3 @@ def simulator_ws(ws):
   url = url.replace("-ws", "")
 
   return mirror(ws, url)
-

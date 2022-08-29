@@ -11,8 +11,9 @@ from flask import (
 from flask_bcrypt import check_password_hash, generate_password_hash
 from flask_login import login_user, logout_user
 
-from app import db
-from app.models import ActivationCode, User
+from app import db, q
+from app.models import User
+from app.lib import create_pod
 
 from .forms import SignUpForm
 
@@ -71,7 +72,8 @@ def signup():
       first_name=first_name,
       last_name=last_name,
       username=username,
-      activation_code=activation_code
+      activation_code=activation_code,
+      can_demo=True # TODO: will probably want to set this to false some time.
     )
 
     db.session.add(user)
@@ -83,6 +85,9 @@ def signup():
       return jsonify({"error": "Could not sign up user"}), 500
 
     login_user(user, remember=True)
+
+    # Create a container for this user in advance.
+    q.enqueue_call(create_pod, args=(str(user.id),))
 
     return redirect(url_for("demo.index"))
   else:
