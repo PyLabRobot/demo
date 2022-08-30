@@ -15,7 +15,7 @@ PRODUCTION = False
 if PRODUCTION:
   SERVER_HOST = "http://simulator.pylabrobot.org/"
 else:
-  SERVER_HOST = "http://0.0.0.0:5001/"
+  SERVER_HOST = "http://localhost/"
 
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -63,7 +63,8 @@ def get_session_id():
 
 # thread safe session
 redis_host = os.environ.get("REDIS_HOST", "localhost")
-redis_client = redis.StrictRedis(host=redis_host, port=6379, db=0, decode_responses=True)
+redis_pool = redis.ConnectionPool(host=redis_host, port=6379, db=0, decode_responses=True)
+redis_client = redis.StrictRedis(connection_pool=redis_pool)
 def _redis_key(key): return f"demo.{get_session_id()}.{key}"
 def session_set(key, value): redis_client.set(_redis_key(key), value)
 def session_get(key): return redis_client.get(_redis_key(key))

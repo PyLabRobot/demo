@@ -9,8 +9,10 @@ The simulator server.
 - Dev:
 
 ```sh
-docker compose -f docker-compose.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
+
+Server will run at [http://localhost](http://localhost).
 
 - Prod:
 

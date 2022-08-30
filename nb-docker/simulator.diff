@@ -1,0 +1,41 @@
+diff --git a/pylabrobot/liquid_handling/backends/simulation/simulator/index.html b/pylabrobot/liquid_handling/backends/simulation/simulator/index.html
+index a1ef3a6..bd808cc 100644
+--- a/pylabrobot/liquid_handling/backends/simulation/simulator/index.html
++++ b/pylabrobot/liquid_handling/backends/simulation/simulator/index.html
+@@ -18,7 +18,7 @@
+ 
+     <script src="https://unpkg.com/konva@8/konva.min.js"></script>
+ 
+-    <link href="./main.css" rel="stylesheet"></link>
++    <link href="/simulator/main.css" rel="stylesheet"></link>
+   </head>
+   <body>
+     <nav class="navbar bg-light">
+@@ -38,6 +38,6 @@
+       </main>
+     </div>
+ 
+-    <script src="./main.js"></script>
++    <script src="/simulator/main.js"></script>
+   </body>
+ </html>
+diff --git a/pylabrobot/liquid_handling/backends/simulation/simulator/main.js b/pylabrobot/liquid_handling/backends/simulation/simulator/main.js
+index ca152d2..5e2f3ef 100644
+--- a/pylabrobot/liquid_handling/backends/simulation/simulator/main.js
++++ b/pylabrobot/liquid_handling/backends/simulation/simulator/main.js
+@@ -492,7 +492,14 @@ function openSocket() {
+ 
+   socketLoading = true;
+   updateStatusLabel("loading");
+-  webSocket = new WebSocket(`ws://localhost:2121/`);
++  let host = window.location.host;
++  let protocol;
++  if (window.location.protocol === "https:/") {
++    protocol = "wss";
++  } else {
++    protocol = "ws";
++  }
++  webSocket = new WebSocket(`${protocol}://${host}/simulator-ws`);
+ 
+   webSocket.onopen = function (event) {
+     console.log("Connected to " + event.target.URL);

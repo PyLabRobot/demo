@@ -10,6 +10,7 @@ import urllib
 from flask import request, jsonify, session, url_for, redirect, Response, Blueprint, render_template, current_app
 from flask_login import current_user, login_required
 from simple_websocket import ConnectionClosed
+import redis
 import websockets
 
 from app import (
@@ -20,6 +21,8 @@ from app import (
   session_clear,
   sock,
   loop,
+  redis_client,
+  redis_pool,
   PRINT,
   SERVER_HOST,
   PRODUCTION
@@ -27,7 +30,8 @@ from app import (
 from app.lib import (
   create_pod,
   container_running,
-  run_pod
+  run_pod,
+  get_pubsub_channel_name
 )
 
 demo = Blueprint("demo", __name__)
@@ -135,23 +139,59 @@ def master(ws):
   """ Handle a websocket connection to the master server. """
   sid = None
 
+  # Get new redis connection, because pubsub blocks the connection.
+  r = redis.StrictRedis(connection_pool=redis_pool)
+  p = r.pubsub()
+  channel = get_pubsub_channel_name(current_user.id)
+  p.subscribe(channel)
+
   while True:
-    message = ws.receive()
-    try: message = json.loads(message)
-    except json.JSONDecodeError:
-      ws.send("Invalid JSON")
-      print("Invalid JSON")
-      continue
+    # read using timeout=0 for non-blocking, ...
+    try:
+      message = ws.receive(timeout=0)
+    except ConnectionClosed:
+      break
 
-    d = {"id": message.get("id"), "type": message.get("type")}
+    # ..., which returns None if no message is available.
+    if message is not None:
+      # Try to decode the message as JSON.
+      try: message = json.loads(message)
+      except json.JSONDecodeError:
+        ws.send("Invalid JSON")
+        print("Invalid JSON")
+        continue
 
-    if message.get("type") == "set-session":
-      sid = message.get("session_id")
-      master_websocket_servers[sid] = ws
-      print("set master", sid)
-      session["id"] = sid # for `get_session`, which uses this
-      d.update(get_session())
-      ws.send(json.dumps(d))
+      d = {"id": message.get("id"), "type": message.get("type")}
+
+      # Handle the message.
+      if message.get("type") == "set-session":
+        sid = message.get("session_id")
+        master_websocket_servers[sid] = ws
+        print("set master", sid)
+        session["id"] = sid # for `get_session`, which uses this
+        d.update(get_session())
+        ws.send(json.dumps(d))
+
+    # Listen for messages on the pubsub channel.
+    message = p.get_message() # also non-blocking
+    if message is not None:
+      if PRINT: print("!" * 10, "got pubsub message", message)
+
+      if message.get("type") == "message":
+        data = message.get("data")
+        data = json.loads(data)
+
+        if data.get("type") == "set-file-server":
+          ws.send(json.dumps({"type": "set-simulator", "url": data.get("simulator_url")}))
+
+        # Send the message to the client.
+        ws.send(json.dumps(data))
+
+  try: ws.close()
+  except: pass
+
+  try: p.close()
+  except: pass
 
 ss = {}
 
@@ -185,9 +225,6 @@ def forward(url):
   if PRINT: print("*"*10, "forwarding", request.url, "->", url, f"({resp.status_code})", resp.content[:20])
   return response
 
-async def send_websocket_message(message, client):
-  await client.send(message)
-
 def get_host_for_user(uid):
   return f"nb-{uid}"
 
@@ -203,6 +240,9 @@ def notebook(path):
 websocket_clients = {}
 
 def mirror(ws, url, on_message=None):
+  async def send_websocket_message(message, client):
+    await client.send(message)
+
   if PRINT: print("#"*10, "connecting ws to", url)
 
   # TODO: replace lock with client callback.
@@ -255,17 +295,19 @@ def on_message(message, ws): # scan notebook output for simulation started comma
       output = data["content"]["text"]
     else:
       output = None
-
-    print("output:", output)
-  except:
-    print("whatever, blah")
+  except (AttributeError, KeyError):
+    pass
 
   if output is not None:
     matches = re.search(r"Simulation server started at (?P<simulator_url>http://[a-zA-Z.0-9:/]+)", output)
     if matches is not None:
       # Store the simulator URL in the session and send it to the browser
       simulator_url = matches.group("simulator_url") + "/"
-      simulator_url = simulator_url.replace("http://", "wss://")
+      if PRODUCTION:
+        protocol = "wss"
+      else:
+        protocol = "ws"
+      simulator_url = simulator_url.replace("http", protocol)
       session_set("simulator_url", simulator_url)
     elif "Simulation server started at " in output:
       # Debug message for regex, not really needed
@@ -282,13 +324,15 @@ def on_message(message, ws): # scan notebook output for simulation started comma
       session_set("file_server_url", file_server_url)
       print("did find fsu", file_server_url)
 
-      mws = master_websocket_servers.get(get_session_id())
-      if mws is not None:
-        mws.send(json.dumps({
+      # Send data to pubsub. This data will get picked up by a sub if a websocket is connected to
+      # the pubsub channel.
+      channel = get_pubsub_channel_name(current_user.id)
+      redis_client.publish(
+        channel=channel,
+        message=json.dumps({
           "type": "set-file-server",
           "simulator_url": url_for("demo.simulator_index", path="/")
         }))
-      else: print("mws is none with ", get_session_id())
     elif "File server started at " in output:
       # Debug message for regex, not really needed
       print("No match for file server while output was:", output)
@@ -304,9 +348,9 @@ def notebook_ws(ws, path):
 
   return mirror(ws, url, on_message)
 
-@login_required
 @demo.route("/simulator", defaults={"path": "/"})
 @demo.route("/simulator/<path:path>")
+@login_required
 def simulator_index(path):
   file_server_url = session_get("file_server_url")
   request_url = request.url.replace(request.host_url, file_server_url).replace("/simulator", "")
@@ -318,9 +362,6 @@ def simulator_index(path):
 def simulator_ws(ws):
   # Why does request.url have `http://` and not `ws://`?
   url = _get_sim_url_for_user(current_user.id)
-  print("sim url for user:", url)
-  print(1000*"sim url for user:", url)
   url = url.replace("http", "ws")
   url = url.replace("-ws", "")
-
   return mirror(ws, url)

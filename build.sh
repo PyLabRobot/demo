@@ -1,3 +1,5 @@
+set -e
+
 cd nb-docker
 
 if [ ! -d "PyLabRobot" ]
@@ -7,6 +9,9 @@ fi
 
 cd PyLabRobot
 git pull
+git checkout .
+git apply ../simulator.diff
+echo "Applied diff"
 cd ..
 
 docker image build -t nb-simple .

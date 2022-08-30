@@ -3,7 +3,10 @@ import subprocess
 import time
 from typing import Optional
 
-from app import PRODUCTION
+from app import PRODUCTION, redis_client
+from app.lib.events import (
+  CONTAINER_STARTED
+)
 
 def get_host_for_user(uid):
   return f"nb-{uid}"
@@ -56,7 +59,7 @@ def create_pod(uid):
     sandbox = ""
     resources = ""
     if PRODUCTION:
-      ram = "1024m"
+      ram = "768m"
       cpu = 1
       sandbox = "--runtime=runsc"
       resources = f"-m {ram} --cpus={cpu}"
@@ -89,6 +92,8 @@ def run_pod(uid) -> Optional[str]:
   while True:
     line = p.stderr.readline()
     if line is not None and "is running at:" in line:
+      channel = get_pubsub_channel_name(uid)
+      redis_client.publish(channel, json.dumps({"event": CONTAINER_STARTED}))
       break
 
     time.sleep(0.01)
@@ -98,3 +103,9 @@ def run_pod(uid) -> Optional[str]:
       return line
 
   return None
+
+
+# pubsub
+
+def get_pubsub_channel_name(uid):
+  return f"user-{uid}"

@@ -19,5 +19,4 @@ ENV RICK yes
 
 ENV JUPYTER_CONFIG_DIR = .
 
-#ENTRYPOINT ["jupyter", "notebook", "--port=8888"]
 ENTRYPOINT ["jupyter", "notebook", "--port=8888", "--config=jupyter_notebook_config.py", "--ip=0.0.0.0", "notebooks"]
