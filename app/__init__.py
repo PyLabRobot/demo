@@ -10,8 +10,8 @@ from flask_sqlalchemy import SQLAlchemy
 import redis
 from rq import Queue
 
-PRINT = True
-PRODUCTION = False
+PRODUCTION = os.getenv("PRODUCTION") in ["1", "True", "true"]
+PRINT = not PRODUCTION
 if PRODUCTION:
   SERVER_HOST = "http://simulator.pylabrobot.org/"
 else:
