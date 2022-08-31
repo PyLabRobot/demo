@@ -1,3 +1,4 @@
+import contextlib
 import os
 import sys
 
@@ -9,9 +10,23 @@ sys.path.insert(0, ".")
 listen = ['default']
 
 redis_host = os.environ.get("REDIS_HOST")
-redis_client = redis.StrictRedis(host=redis_host, port=6379, db=0, decode_responses=False)
+
+
+@contextlib.contextmanager
+def get_redis() -> redis.Redis:
+  # Not optimal to create a new connection for each job, but it does not really seem possible to
+  # share a connection within the worker. https://github.com/rq/rq/issues/720
+  # Perhaps we can use SimpleWorker, which, as mentioned in the thread, uses a single process.
+  r = redis.StrictRedis(host=redis_host, port=6379, db=0, decode_responses=False)
+  try:
+    yield r
+  finally:
+    r.close()
+
 
 if __name__ == '__main__':
+  redis_client = redis.StrictRedis(host=redis_host, port=6379, db=0, decode_responses=False)
+
   with Connection(redis_client):
     worker = Worker(list(map(Queue, listen)))
     worker.work()

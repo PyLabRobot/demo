@@ -65,13 +65,6 @@ def get_session_id():
 redis_host = os.environ.get("REDIS_HOST", "localhost")
 redis_pool = redis.ConnectionPool(host=redis_host, port=6379, db=0, decode_responses=True)
 redis_client = redis.StrictRedis(connection_pool=redis_pool)
-def _redis_key(key): return f"demo.{get_session_id()}.{key}"
-def session_set(key, value): redis_client.set(_redis_key(key), value)
-def session_get(key): return redis_client.get(_redis_key(key))
-def session_has(key): return redis_client.exists(_redis_key(key))
-def session_del(key): return redis_client.delete(_redis_key(key))
-def session_clear():
-  for k in redis_client.scan_iter(f"demo.{get_session_id()}"): redis_client.delete(k)
 
 q = Queue(connection=redis_client)
 

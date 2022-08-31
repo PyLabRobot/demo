@@ -15,6 +15,17 @@ function hideNotebookMessage() {
   message.style.display = "none";
 }
 
+function showNotebookStoppedMessage() {
+  hideNotebookMessage();
+  var message = document.getElementById("notebook-stopped");
+  message.style.display = "block";
+}
+
+function hideNotebookStoppedMessage() {
+  var message = document.getElementById("notebook-stopped");
+  message.style.display = "none";
+}
+
 function loadSimulator(simulator_iframe_url) {
   if (document.getElementById("simulator-iframe")) {
     document.getElementById("simulator-iframe").remove();
@@ -44,6 +55,14 @@ function loadNotebook(notebook_iframe_url) {
   notebook_iframe.src = notebook_iframe_url;
   notebook.appendChild(notebook_iframe);
   hideNotebookMessage();
+  hideNotebookStoppedMessage();
+}
+
+function stopNotebook() {
+  if (document.getElementById("notebook-iframe")) {
+    document.getElementById("notebook-iframe").remove();
+  }
+  showNotebookStoppedMessage();
 }
 
 function getSession() {
@@ -79,12 +98,23 @@ function startMasterWebsocket() {
       console.log(data.error);
       alert(data.error);
     } else if (data.type === "set-session") {
-      loadNotebook(data.notebook_iframe_url);
+      if (
+        !(
+          data.notebook_iframe_url === undefined ||
+          data.notebook_iframe_url === null
+        )
+      ) {
+        loadNotebook(data.notebook_iframe_url);
+      }
 
       if (data.hasOwnProperty("simulator_url")) {
         loadSimulator(data.simulator_url);
         console.log("Loaded simulator");
       }
+    } else if (data.type === "start-notebook") {
+      loadNotebook(data.url);
+    } else if (data.type === "stop-notebook") {
+      stopNotebook();
     } else if (data.type === "start-simulator") {
       loadSimulator(data.url);
     } else if (data.type === "stop-simulator") {
@@ -93,7 +123,11 @@ function startMasterWebsocket() {
   };
 
   ws.onclose = function () {
-    console.log("Disconnected from master websocket");
+    console.log("Disconnected from master websocket. Retrying in 1 sec...");
+
+    setTimeout(function () {
+      startMasterWebsocket();
+    }, 1000);
   };
 }
 

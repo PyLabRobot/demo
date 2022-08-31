@@ -2,6 +2,7 @@
 FROM python:slim
 
 RUN apt-get update
+
 RUN apt-get -y install libpq-dev gcc
 RUN pip install psycopg2
 
@@ -19,4 +20,4 @@ RUN pip install -r requirements.txt
 COPY . .
 
 # Run app.py when the container launches
-ENTRYPOINT python worker/worker.py
+ENTRYPOINT python monitor/monitor.py

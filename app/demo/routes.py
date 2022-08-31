@@ -10,6 +10,8 @@ import urllib
 from flask import request, jsonify, session, url_for, redirect, Response, Blueprint, render_template
 from flask_login import current_user, login_required
 from app.lib.events import (
+  NOTEBOOK_STARTED,
+  NOTEBOOK_STOPPED,
   SIMULATION_FILE_SERVER_STARTED,
   SIMULATION_FILE_SERVER_STOPPED,
 )
@@ -19,25 +21,28 @@ import websockets
 
 from app import (
   get_session_id,
-  session_del,
-  session_has,
-  session_get,
-  session_set,
-  session_clear,
   sock,
   loop,
   redis_client,
   redis_pool,
   PRINT,
   SERVER_HOST,
-  PRODUCTION
+  PRODUCTION,
+  q
 )
+import app.lib as lib
 from app.lib import (
   create_pod,
-  container_running,
   run_pod,
-  get_pubsub_channel_name
+  get_pubsub_channel_name,
 )
+import app.lib.cache as cache
+
+def session_del(key): cache.del_(redis_client, key, current_user.id)
+def session_has(key): return cache.has(redis_client, key, current_user.id)
+def session_get(key): return cache.get(redis_client, key, current_user.id)
+def session_set(key, value): cache.set(redis_client, key, value, current_user.id)
+def session_clear(): cache.clear(redis_client, current_user.id)
 
 demo = Blueprint("demo", __name__)
 
@@ -46,26 +51,16 @@ sim = 2121
 fs = 1337
 
 def _get_nb_url_for_user(uid):
-  host = session_get("container_host")
+  host = get_host_for_user(uid)
   return f"http://{host}:{nb}/"
 
 def _get_sim_url_for_user(uid):
-  host = session_get("container_host")
+  host = get_host_for_user(uid)
   return f"http://{host}:{sim}/"
 
 def _get_fs_url_for_user(uid):
-  host = session_get("container_host")
+  host = get_host_for_user(uid)
   return f"http://{host}:{fs}/"
-
-def stop_simulator():
-  """ Stop the simulator for the current_user. """
-  channel = get_pubsub_channel_name(current_user.id)
-  redis_client.publish(
-    channel=channel,
-    message=json.dumps({
-      "event": SIMULATION_FILE_SERVER_STOPPED
-    }))
-  session_del("simulator_url")
 
 @demo.route("/")
 @login_required
@@ -131,18 +126,17 @@ def get_session():
     return {"error": err, "type": "error"}
 
   print("*"*10, "get_session", sid)
-  if not container_running(sid):
-    print("run pod")
-    run_pod(sid)
+  if not session_get(cache.keys.container_running) == "1":
+    q.enqueue_call(run_pod, args=(sid,))
   else:
     print("is running?", sid)
 
-  session_set("container_host", get_host_for_user(current_user.id))
-
-  iframe_url = f"/notebook/notebooks/notebook.ipynb"
-
-  d = {"notebook_iframe_url": iframe_url, "session_id": sid}
-  if session_has("file_server_url"): d["simulator_url"] = url_for("demo.simulator_index")
+  d = {"session_id": sid}
+  if session_get(cache.keys.notebook_running) == "1":
+    iframe_url = "/notebook/notebooks/notebook.ipynb"
+    d["notebook_iframe_url"] = iframe_url
+  if session_get(cache.keys.simulator_running) == 1:
+    d["simulator_url"] = url_for("demo.simulator_index")
   return d
 
 master_websocket_servers = {}
@@ -182,7 +176,6 @@ def master(ws):
         sid = message.get("session_id")
         master_websocket_servers[sid] = ws
         print("set master", sid)
-        session["id"] = sid # for `get_session`, which uses this
         d.update(get_session())
         ws.send(json.dumps(d))
 
@@ -196,10 +189,19 @@ def master(ws):
         data = json.loads(data)
         event = data.get("event")
 
-        if event == SIMULATION_FILE_SERVER_STARTED:
-          ws.send(json.dumps({"type": "start-simulator", "url": data.get("simulator_url")}))
+        if event == NOTEBOOK_STARTED:
+          iframe_url = "/notebook/notebooks/notebook.ipynb"
+          ws.send(json.dumps({"type": "start-notebook", "url": iframe_url}))
+        elif event == NOTEBOOK_STOPPED:
+          ws.send(json.dumps({"type": "stop-notebook"}))
+        elif event == SIMULATION_FILE_SERVER_STARTED:
+          ws.send(json.dumps({
+            "type": "start-simulator",
+            "url": url_for("demo.simulator_index", path="/")}))
         elif event == SIMULATION_FILE_SERVER_STOPPED:
           ws.send(json.dumps({"type": "stop-simulator"}))
+
+    time.sleep(0.0001)
 
   try: ws.close()
   except: pass
@@ -254,7 +256,7 @@ def notebook(path):
   if path.endswith("/restart") or \
     (path.startswith("api/sessions/") and request.method == "DELETE"):
     # On notebook restart/shutdown, the simulation server is stopped.
-    stop_simulator()
+    lib.handle_simulator_stopped(redis_client, current_user.id)
 
   return forward(request_url)
 
@@ -324,28 +326,16 @@ def on_message(message, ws): # scan notebook output for simulation started comma
     # Store file server URL in the session
     matches = re.search(r"File server started at (?P<file_server_url>http://[a-zA-Z.0-9:/]+)", output)
     if matches is not None:
-      # Store the file serfver URL in the session and send it to the browser
-      # file_server_url = matches.group("file_server_url") + "/"
-      file_server_url = _get_fs_url_for_user(current_user.id)
-      session_set("file_server_url", file_server_url)
-      print("did find fsu", file_server_url)
-
       # Send data to pubsub. This data will get picked up by a sub if a websocket is connected to
       # the pubsub channel.
-      channel = get_pubsub_channel_name(current_user.id)
-      redis_client.publish(
-        channel=channel,
-        message=json.dumps({
-          "event": SIMULATION_FILE_SERVER_STARTED,
-          "simulator_url": url_for("demo.simulator_index", path="/")
-        }))
+      lib.handle_simulator_started(redis_client, current_user.id)
     elif "File server started at " in output:
       # Debug message for regex, not really needed
       print("No match for file server while output was:", output)
 
     # Store file server URL in the session
     if "server closed" in output:
-      stop_simulator()
+      lib.handle_simulator_stopped(redis_client, current_user.id)
 
 
 @sock.route("/notebook/<path:path>")
@@ -362,7 +352,7 @@ def notebook_ws(ws, path):
 @demo.route("/simulator/<path:path>")
 @login_required
 def simulator_index(path):
-  file_server_url = session_get("file_server_url")
+  file_server_url = _get_fs_url_for_user(current_user.id)
   request_url = request.url.replace(request.host_url, file_server_url).replace("/simulator", "")
   return forward(request_url)
 

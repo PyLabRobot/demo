@@ -91,6 +91,34 @@ services:
 
       PYTHONUNBUFFERED: 1
 
+  monitor:
+    platform: linux/amd64
+    build:
+      context: ./
+      dockerfile: ./monitor/Dockerfile
+    depends_on:
+      - redis
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - web
+    mem_reservation: 64m
+    secrets:
+      - db_password
+      - secret_key
+    restart: always
+    environment:
+      REDIS_HOST: "redis"
+
+      FLASK_ENV: "development"
+      DB_USER: "postgres"
+      DB_HOST: "db"
+      DB_NAME: "db"
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      SECRET_KEY_FILE: /run/secrets/secret_key
+
+      PYTHONUNBUFFERED: 1
+
   nginx:
     platform: linux/amd64
     image: nginxproxy/nginx-proxy

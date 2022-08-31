@@ -23,7 +23,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 After a change to web:
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build web
+docker compose build web
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 ### Generating a new activation code
@@ -49,3 +50,6 @@ sudo docker exec -ti demo-db-1 psql -U postgres -d db
 - [ ] Worker contains all dependencies from the web server, because `lib` imports them. We want
       `lib` to be standalone in this regard, and imported by web and worker. (especially `psycopg2`
       and env vars)
+- [ ] Can we provide the docker image for the simulator on the registry, include it in the simulator
+      readme and also use it here?
+- [ ] Use https://github.com/docker/docker-py
