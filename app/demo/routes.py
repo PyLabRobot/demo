@@ -7,14 +7,19 @@ import time
 import threading
 import urllib
 
-from flask import request, jsonify, session, url_for, redirect, Response, Blueprint, render_template, current_app
+from flask import request, jsonify, session, url_for, redirect, Response, Blueprint, render_template
 from flask_login import current_user, login_required
+from app.lib.events import (
+  SIMULATION_FILE_SERVER_STARTED,
+  SIMULATION_FILE_SERVER_STOPPED,
+)
 from simple_websocket import ConnectionClosed
 import redis
 import websockets
 
 from app import (
   get_session_id,
+  session_del,
   session_has,
   session_get,
   session_set,
@@ -36,7 +41,6 @@ from app.lib import (
 
 demo = Blueprint("demo", __name__)
 
-# helper when not running in a cluster.
 nb = 8888
 sim = 2121
 fs = 1337
@@ -52,6 +56,16 @@ def _get_sim_url_for_user(uid):
 def _get_fs_url_for_user(uid):
   host = session_get("container_host")
   return f"http://{host}:{fs}/"
+
+def stop_simulator():
+  """ Stop the simulator for the current_user. """
+  channel = get_pubsub_channel_name(current_user.id)
+  redis_client.publish(
+    channel=channel,
+    message=json.dumps({
+      "event": SIMULATION_FILE_SERVER_STOPPED
+    }))
+  session_del("simulator_url")
 
 @demo.route("/")
 @login_required
@@ -180,12 +194,12 @@ def master(ws):
       if message.get("type") == "message":
         data = message.get("data")
         data = json.loads(data)
+        event = data.get("event")
 
-        if data.get("type") == "set-file-server":
-          ws.send(json.dumps({"type": "set-simulator", "url": data.get("simulator_url")}))
-
-        # Send the message to the client.
-        ws.send(json.dumps(data))
+        if event == SIMULATION_FILE_SERVER_STARTED:
+          ws.send(json.dumps({"type": "start-simulator", "url": data.get("simulator_url")}))
+        elif event == SIMULATION_FILE_SERVER_STOPPED:
+          ws.send(json.dumps({"type": "stop-simulator"}))
 
   try: ws.close()
   except: pass
@@ -235,6 +249,13 @@ def get_host_for_user(uid):
 def notebook(path):
   forward_host = _get_nb_url_for_user(current_user.id)
   request_url = request.url.replace(request.host_url, forward_host)
+
+  # Handle notebook events.
+  if path.endswith("/restart") or \
+    (path.startswith("api/sessions/") and request.method == "DELETE"):
+    # On notebook restart/shutdown, the simulation server is stopped.
+    stop_simulator()
+
   return forward(request_url)
 
 websocket_clients = {}
@@ -298,23 +319,8 @@ def on_message(message, ws): # scan notebook output for simulation started comma
   except (AttributeError, KeyError):
     pass
 
+  # Parse notebook output to observe simulation start/stop events.
   if output is not None:
-    matches = re.search(r"Simulation server started at (?P<simulator_url>http://[a-zA-Z.0-9:/]+)", output)
-    if matches is not None:
-      # Store the simulator URL in the session and send it to the browser
-      simulator_url = matches.group("simulator_url") + "/"
-      if PRODUCTION:
-        protocol = "wss"
-      else:
-        protocol = "ws"
-      simulator_url = simulator_url.replace("http", protocol)
-      session_set("simulator_url", simulator_url)
-    elif "Simulation server started at " in output:
-      # Debug message for regex, not really needed
-      print("No match for simulation server while output was:", output)
-    session_set("simulator_url", _get_sim_url_for_user(current_user.id))
-    print("Simulator URL:", session_get("simulator_url"))
-
     # Store file server URL in the session
     matches = re.search(r"File server started at (?P<file_server_url>http://[a-zA-Z.0-9:/]+)", output)
     if matches is not None:
@@ -330,12 +336,16 @@ def on_message(message, ws): # scan notebook output for simulation started comma
       redis_client.publish(
         channel=channel,
         message=json.dumps({
-          "type": "set-file-server",
+          "event": SIMULATION_FILE_SERVER_STARTED,
           "simulator_url": url_for("demo.simulator_index", path="/")
         }))
     elif "File server started at " in output:
       # Debug message for regex, not really needed
       print("No match for file server while output was:", output)
+
+    # Store file server URL in the session
+    if "server closed" in output:
+      stop_simulator()
 
 
 @sock.route("/notebook/<path:path>")
@@ -354,7 +364,6 @@ def notebook_ws(ws, path):
 def simulator_index(path):
   file_server_url = session_get("file_server_url")
   request_url = request.url.replace(request.host_url, file_server_url).replace("/simulator", "")
-  print(file_server_url, request.host_url, request_url)
   return forward(request_url)
 
 @sock.route("/simulator-ws")

@@ -5,6 +5,11 @@ function hideSimulatorMessage() {
   message.style.display = "none";
 }
 
+function showSimulatorMessage() {
+  var message = document.getElementById("simulator-not-loaded");
+  message.style.display = "block";
+}
+
 function hideNotebookMessage() {
   var message = document.getElementById("notebook-not-loaded");
   message.style.display = "none";
@@ -20,6 +25,13 @@ function loadSimulator(simulator_iframe_url) {
   simulator_iframe.id = "simulator-iframe";
   simulator.appendChild(simulator_iframe);
   hideSimulatorMessage();
+}
+
+function stopSimulator() {
+  if (document.getElementById("simulator-iframe")) {
+    document.getElementById("simulator-iframe").remove();
+  }
+  showSimulatorMessage();
 }
 
 function loadNotebook(notebook_iframe_url) {
@@ -73,8 +85,10 @@ function startMasterWebsocket() {
         loadSimulator(data.simulator_url);
         console.log("Loaded simulator");
       }
-    } else if (data.type === "set-file-server") {
-      loadSimulator(data.simulator_url);
+    } else if (data.type === "start-simulator") {
+      loadSimulator(data.url);
+    } else if (data.type === "stop-simulator") {
+      stopSimulator();
     }
   };
 
