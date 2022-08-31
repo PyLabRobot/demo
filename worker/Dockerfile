@@ -2,15 +2,13 @@
 FROM python:slim
 
 RUN apt-get update
-RUN apt-get -y install libpq-dev gcc
-RUN pip install psycopg2
 
 # install docker
 RUN apt-get install -y curl
 RUN curl -fsSL https://get.docker.com/ -o get-docker.sh \
   && sh get-docker.sh
 
-COPY requirements.txt .
+COPY worker/requirements.txt .
 
 # Install any needed packages specified in requirements.txt
 RUN pip install -r requirements.txt
@@ -19,4 +17,5 @@ RUN pip install -r requirements.txt
 COPY . .
 
 # Run app.py when the container launches
-ENTRYPOINT python worker/worker.py
+ENTRYPOINT ["python", "worker/worker.py"]
+

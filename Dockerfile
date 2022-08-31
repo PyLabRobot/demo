@@ -28,5 +28,4 @@ EXPOSE 5001
 ENV NAME World
 
 # Run app.py when the container launches
-#CMD ["python", "kub.py"]
-ENTRYPOINT python -m gunicorn --workers 1 --threads 10 --bind :5001 wsgi:app --timeout 90 --worker-class gevent
+ENTRYPOINT ["python", "-m gunicorn --workers 1 --threads 10 --bind :5001 wsgi:app --timeout 90 --worker-class gevent"]

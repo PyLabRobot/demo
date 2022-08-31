@@ -4,9 +4,9 @@ import time
 from typing import Optional
 import uuid
 
-from app import PRODUCTION, PRINT
-import app.lib.cache as cache
-from app.lib.events import (
+from lib.conf import PRODUCTION, PRINT
+import lib.cache as cache
+from lib.events import (
   CONTAINER_STARTED,
   CONTAINER_STOPPED,
   NOTEBOOK_STARTED,

@@ -9,7 +9,7 @@ import urllib
 
 from flask import request, jsonify, session, url_for, redirect, Response, Blueprint, render_template
 from flask_login import current_user, login_required
-from app.lib.events import (
+from lib.events import (
   NOTEBOOK_STARTED,
   NOTEBOOK_STOPPED,
   SIMULATION_FILE_SERVER_STARTED,
@@ -25,18 +25,18 @@ from app import (
   loop,
   redis_client,
   redis_pool,
-  PRINT,
   SERVER_HOST,
-  PRODUCTION,
   q
 )
-import app.lib as lib
-from app.lib import (
+import lib as lib
+from lib import (
   create_pod,
   run_pod,
   get_pubsub_channel_name,
+  PRINT,
+  PRODUCTION
 )
-import app.lib.cache as cache
+import lib.cache as cache
 
 def session_del(key): cache.del_(redis_client, key, current_user.id)
 def session_has(key): return cache.has(redis_client, key, current_user.id)

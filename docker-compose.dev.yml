@@ -9,4 +9,4 @@ services:
       - "./:/app"
     environment:
       FLASK_ENV: "development"
-    entrypoint: ./start.dev.sh
+    entrypoint: ["flask", "run", "--host=0.0.0.0", "--port=5001"]

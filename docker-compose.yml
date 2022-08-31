@@ -30,7 +30,6 @@ services:
       - db_password
 
   web:
-    platform: linux/amd64
     build: .
     depends_on:
       - redis
@@ -62,7 +61,6 @@ services:
     mem_reservation: 128m
 
   worker:
-    platform: linux/amd64
     build:
       context: ./
       dockerfile: ./worker/Dockerfile
@@ -76,23 +74,12 @@ services:
     networks:
       - web
     mem_reservation: 64m
-    secrets:
-      - db_password
-      - secret_key
     environment:
       REDIS_HOST: "redis"
-
-      FLASK_ENV: "development"
-      DB_USER: "postgres"
-      DB_HOST: "db"
-      DB_NAME: "db"
-      DB_PASSWORD_FILE: /run/secrets/db_password
-      SECRET_KEY_FILE: /run/secrets/secret_key
 
       PYTHONUNBUFFERED: 1
 
   monitor:
-    platform: linux/amd64
     build:
       context: ./
       dockerfile: ./monitor/Dockerfile
@@ -103,19 +90,9 @@ services:
     networks:
       - web
     mem_reservation: 64m
-    secrets:
-      - db_password
-      - secret_key
     restart: always
     environment:
       REDIS_HOST: "redis"
-
-      FLASK_ENV: "development"
-      DB_USER: "postgres"
-      DB_HOST: "db"
-      DB_NAME: "db"
-      DB_PASSWORD_FILE: /run/secrets/db_password
-      SECRET_KEY_FILE: /run/secrets/secret_key
 
       PYTHONUNBUFFERED: 1
 

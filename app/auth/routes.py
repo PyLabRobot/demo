@@ -13,7 +13,7 @@ from flask_login import login_user, logout_user
 
 from app import db, q
 from app.models import User
-from app.lib import create_pod
+from lib import create_pod
 
 from .forms import SignUpForm
 

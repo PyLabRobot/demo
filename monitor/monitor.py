@@ -2,6 +2,7 @@
 
 import json
 import os
+import signal
 import subprocess
 import sys
 
@@ -10,7 +11,7 @@ from rq import Queue
 
 sys.path.insert(0, ".")
 
-import app.lib as lib
+import lib
 
 
 def main():
@@ -44,4 +45,5 @@ def main():
 
 
 if __name__ == "__main__":
+  signal.signal(signal.SIGTERM, lambda: sys.exit(0))
   main()
