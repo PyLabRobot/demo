@@ -39,7 +39,7 @@ def main():
       if event.get("Action") == "start":
         print("M"*10, "container started:", uid)
         lib.handle_container_started(redis_client, uid, q)
-      elif event.get("Action") == "stop":
+      elif event.get("Action") == "stop" or event.get("Action") == "die":
         print("M"*10, "container stopped:", uid)
         lib.handle_container_stopped(redis_client, uid)
 
