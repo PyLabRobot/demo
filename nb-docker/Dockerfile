@@ -3,7 +3,7 @@ FROM jupyter/base-notebook
 WORKDIR /nb-docker
 
 COPY custom ./custom
-COPY jupyter_notebook_config.py jupyter_notebook_config.py
+COPY --chown=root:root jupyter_notebook_config.py jupyter_notebook_config.py
 
 USER ${NB_UID}
 COPY --chown=jovyan:users PyLabRobot pylabrobot
@@ -17,6 +17,5 @@ EXPOSE 1337
 
 ENV RICK yes
 
-ENV JUPYTER_CONFIG_DIR = .
-
 ENTRYPOINT ["jupyter", "notebook", "--port=8888", "--config=jupyter_notebook_config.py", "--ip=0.0.0.0", "notebooks"]
+

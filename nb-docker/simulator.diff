@@ -30,7 +30,7 @@ index ca152d2..5e2f3ef 100644
 -  webSocket = new WebSocket(`ws://localhost:2121/`);
 +  let host = window.location.host;
 +  let protocol;
-+  if (window.location.protocol === "https:/") {
++  if (window.location.protocol === "https:") {
 +    protocol = "wss";
 +  } else {
 +    protocol = "ws";
