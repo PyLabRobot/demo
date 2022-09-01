@@ -178,6 +178,8 @@ def master(ws):
         print("set master", sid)
         d.update(get_session())
         ws.send(json.dumps(d))
+      elif message.get("event") == "ping":
+        ws.send(json.dumps({ "event": "pong" }))
 
     # Listen for messages on the pubsub channel.
     message = p.get_message() # also non-blocking

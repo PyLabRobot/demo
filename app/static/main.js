@@ -88,6 +88,8 @@ function startMasterWebsocket() {
   ws.onopen = function () {
     console.log("Connected to master websocket");
     getSession();
+
+    heartbeat();
   };
 
   ws.onmessage = function (event) {
@@ -129,6 +131,12 @@ function startMasterWebsocket() {
       startMasterWebsocket();
     }, 1000);
   };
+}
+
+function heartbeat() {
+  if (!ws) return;
+  ws.send(JSON.stringify({ event: "ping" }));
+  setTimeout(heartbeat, 5000);
 }
 
 function start() {
