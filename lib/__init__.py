@@ -98,7 +98,7 @@ def get_pubsub_channel_name(uid):
 def monitor_container(uid):
   print("monitoring container" * 10)
   container_name = get_host_for_user(uid)
-  cmd = f"docker logs {container_name} --follow"
+  cmd = f"docker logs {container_name} --follow --since 5s"
   print(cmd)
   p = subprocess.Popen(cmd, shell=True, universal_newlines=True,
     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
