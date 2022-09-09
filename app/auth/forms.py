@@ -1,9 +1,9 @@
-from re import L
 from flask_wtf import FlaskForm
 from wtforms import StringField
 from wtforms.validators import DataRequired, Email, Length, ValidationError
 
-from app.models import ActivationCode, User
+from lib.models import ActivationCode, User
+
 
 class SignUpForm(FlaskForm):
   # pylint: disable=no-self-argument

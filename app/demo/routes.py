@@ -26,7 +26,8 @@ from app import (
   redis_client,
   redis_pool,
   SERVER_HOST,
-  q
+  q,
+  dbs,
 )
 import lib as lib
 from lib import (
@@ -135,7 +136,7 @@ def get_session():
   if session_get(cache.keys.notebook_running) == "1":
     iframe_url = "/notebook/notebooks/notebook.ipynb"
     d["notebook_iframe_url"] = iframe_url
-  if session_get(cache.keys.simulator_running) == 1:
+  if session_get(cache.keys.simulator_running) == "1":
     d["simulator_url"] = url_for("demo.simulator_index")
   return d
 
@@ -258,7 +259,7 @@ def notebook(path):
   if path.endswith("/restart") or \
     (path.startswith("api/sessions/") and request.method == "DELETE"):
     # On notebook restart/shutdown, the simulation server is stopped.
-    lib.handle_simulator_stopped(redis_client, current_user.id)
+    lib.handle_simulator_stopped(redis_client, dbs, current_user.id)
 
   return forward(request_url)
 
@@ -330,14 +331,14 @@ def on_message(message, ws): # scan notebook output for simulation started comma
     if matches is not None:
       # Send data to pubsub. This data will get picked up by a sub if a websocket is connected to
       # the pubsub channel.
-      lib.handle_simulator_started(redis_client, current_user.id)
+      lib.handle_simulator_started(redis_client, dbs, current_user.id)
     elif "File server started at " in output:
       # Debug message for regex, not really needed
       print("No match for file server while output was:", output)
 
     # Store file server URL in the session
     if "server closed" in output:
-      lib.handle_simulator_stopped(redis_client, current_user.id)
+      lib.handle_simulator_stopped(redis_client, dbs, current_user.id)
 
 
 @sock.route("/notebook/<path:path>")

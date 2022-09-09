@@ -1,14 +1,18 @@
+from audioop import getsample
 import sys
-from app import db, ActivationCode
+from app import ActivationCode
+from lib.db import get_session
+
 
 if __name__ == "__main__":
   ac = ActivationCode()
+  session = get_session()
 
-  db.session.add(ac)
+  session.add(ac)
   try:
-    db.session.commit()
+    session.commit()
     print(ac.id)
   except Exception as e:
-    db.session.rollback()
+    session.rollback()
     print("Error: " + str(e))
     sys.exit(1)

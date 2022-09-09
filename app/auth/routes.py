@@ -11,8 +11,8 @@ from flask import (
 from flask_bcrypt import check_password_hash, generate_password_hash
 from flask_login import login_user, logout_user
 
-from app import db, q
-from app.models import User
+from app import q, dbs
+from lib.models import User
 from lib import create_pod
 
 from .forms import SignUpForm
@@ -76,11 +76,11 @@ def signup():
       can_demo=True # TODO: will probably want to set this to false some time.
     )
 
-    db.session.add(user)
+    dbs.add(user)
     try:
-      db.session.commit()
+      dbs.commit()
     except Exception as e:
-      db.session.rollback()
+      dbs.rollback()
       current_app.logger.error(e)
       return jsonify({"error": "Could not sign up user"}), 500
 

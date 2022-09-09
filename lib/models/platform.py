@@ -1,16 +1,17 @@
+from sqlalchemy import Column, ForeignKey, String
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 
-from app import db
-from app.models.base import Base
+from lib.models.base import Base
 
 
 class Project(Base):
   __tablename__ = "projects"
 
-  name = db.Column(db.String(100), nullable=False)
+  name = Column(String(100), nullable=False)
 
-  owner_id = db.Column(UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=False)
-  owner = db.relationship("User", backref=db.backref("projects", lazy=True))
+  owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+  owner = relationship("User", backref="projects", lazy="select")
 
   def __repr__(self):
     return f"Project({self.name})"
@@ -27,11 +28,11 @@ class Project(Base):
 class File(Base):
   __tablename__ = "files"
 
-  name = db.Column(db.String(100), nullable=False)
-  path = db.Column(db.String(500), nullable=False)
+  name = Column(String(100), nullable=False)
+  path = Column(String(500), nullable=False)
 
-  project_id = db.Column(UUID(as_uuid=True), db.ForeignKey("projects.id"), nullable=False)
-  project = db.relationship("Project", backref=db.backref("files", lazy=True))
+  project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+  project = relationship("Project", backref="files", lazy="select")
 
   def __repr__(self):
     return f"File({self.name} {self.url})"

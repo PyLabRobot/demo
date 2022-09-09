@@ -3,6 +3,7 @@ import subprocess
 import time
 from typing import Optional
 import uuid
+from lib.models.event import Event
 
 from lib.conf import PRODUCTION, PRINT
 import lib.cache as cache
@@ -77,7 +78,8 @@ def create_pod(uid):
     out = subprocess.run(cmd, universal_newlines=True, capture_output=True, shell=True)
 
     if out.returncode != 0:
-      raise Exception(json.dumps({"msg": "error creating container", "err": out.stderr, "out": out.stdout}))
+      print(json.dumps({"msg": "error creating container", "err": out.stderr, "out": out.stdout}))
+      return "error creating container"
 
   return None #["created volume", p.stderr, p.stdout, out]
 
@@ -111,16 +113,26 @@ def monitor_container(uid):
       return line
 
     if line is not None and "is running at:" in line:
-      with worker.get_redis() as r:
+      with worker.get_redis() as r, worker.get_db_session() as session:
         time.sleep(0.5) # give it a little time, should not be needed, but beyond our control
-        handle_notebook_started(r, uid)
+        handle_notebook_started(r, session, uid)
       break
 
     time.sleep(0.0001)
 
 # event response handlers
 
-def handle_container_started(r, uid, q):
+def save_event_db(session, uid, event):
+  # save event to db
+  e = Event(code=event, uid=uid)
+  try:
+    session.add(e)
+    session.commit()
+  except Exception as e:
+    print("error saving event to db", e)
+    session.rollback()
+
+def handle_container_started(r, session, uid, q):
   print("HANDLER: handle_container_started")
   channel = get_pubsub_channel_name(uid)
   r.publish(channel, json.dumps({"event": CONTAINER_STARTED}))
@@ -129,33 +141,43 @@ def handle_container_started(r, uid, q):
   # Start worker task to monitor container during startup to detect notebook startup
   q.enqueue_call(monitor_container, args=(uid,))
 
-def handle_notebook_started(r, uid):
+  save_event_db(session, uid, CONTAINER_STARTED)
+
+def handle_notebook_started(r, session, uid):
   print("HANDLER: handle_notebook_started")
   channel = get_pubsub_channel_name(uid)
   cache.set(r, cache.keys.notebook_running, 1, uid)
   r.publish(channel, json.dumps({"event": NOTEBOOK_STARTED}))
 
-def handle_simulator_started(r, uid):
+  save_event_db(session, uid, NOTEBOOK_STARTED)
+
+def handle_simulator_started(r, session, uid):
   print("HANDLER: handle_simulator_started")
   channel = get_pubsub_channel_name(uid)
   cache.set(r, cache.keys.simulator_running, 1, uid)
   r.publish(channel, json.dumps({"event": SIMULATION_FILE_SERVER_STARTED}))
 
-def handle_container_stopped(r, uid):
+  save_event_db(session, uid, SIMULATION_FILE_SERVER_STARTED)
+
+def handle_container_stopped(r, session, uid):
   print("HANDLER: handle_container_stopped")
   channel = get_pubsub_channel_name(uid)
-  handle_notebook_stopped(r, uid)
-  handle_simulator_stopped(r, uid)
+  handle_notebook_stopped(r, session, uid)
+  handle_simulator_stopped(r, session, uid)
   cache.set(r, cache.keys.container_running, 0, uid)
   r.publish(channel, json.dumps({"event": CONTAINER_STOPPED}))
 
-def handle_notebook_stopped(r, uid):
+  save_event_db(session, uid, CONTAINER_STOPPED)
+
+def handle_notebook_stopped(r, session, uid):
   print("HANDLER: handle_notebook_stopped")
   channel = get_pubsub_channel_name(uid)
   cache.set(r, cache.keys.notebook_running, 0, uid)
   r.publish(channel, json.dumps({"event": NOTEBOOK_STOPPED}))
 
-def handle_simulator_stopped(r, uid):
+  save_event_db(session, uid, NOTEBOOK_STOPPED)
+
+def handle_simulator_stopped(r, session, uid):
   print("HANDLER: handle_simulator_stopped")
   channel = get_pubsub_channel_name(uid)
   r.publish(
@@ -164,3 +186,5 @@ def handle_simulator_stopped(r, uid):
       "event": SIMULATION_FILE_SERVER_STOPPED,
     }))
   cache.set(r, cache.keys.simulator_running, 0, uid)
+
+  save_event_db(session, uid, SIMULATION_FILE_SERVER_STOPPED)

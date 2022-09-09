@@ -22,6 +22,8 @@ def main():
   p = subprocess.Popen("docker events --format '{{json .}}' --filter 'type=container'",
     shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
+  session = lib.db.get_session()
+
   while True:
     line = p.stdout.readline()
     if not line:
@@ -38,10 +40,10 @@ def main():
 
       if event.get("Action") == "start":
         print("M"*10, "container started:", uid)
-        lib.handle_container_started(redis_client, uid, q)
+        lib.handle_container_started(redis_client, session, uid, q)
       elif event.get("Action") == "stop" or event.get("Action") == "die":
         print("M"*10, "container stopped:", uid)
-        lib.handle_container_stopped(redis_client, uid)
+        lib.handle_container_stopped(redis_client, session, uid)
 
 
 if __name__ == "__main__":

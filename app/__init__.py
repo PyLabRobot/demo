@@ -6,10 +6,10 @@ from flask import Flask, request, jsonify, session, url_for, redirect
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, current_user
 from flask_sock import Sock
-from flask_sqlalchemy import SQLAlchemy
 import redis
 from rq import Queue
 
+from lib import db
 from lib.conf import PRODUCTION
 
 if PRODUCTION:
@@ -27,23 +27,12 @@ elif "SECRET_KEY_FILE" in os.environ:
 else:
   raise Exception("No secret key specified")
 
-db_host = os.environ["DB_HOST"]
-db_user = os.environ["DB_USER"]
-db_name = os.environ["DB_NAME"]
-if "DB_PASS" in os.environ:
-  db_pass = os.environ["DB_PASS"]
-elif "DB_PASSWORD_FILE" in os.environ:
-  with open(os.environ["DB_PASSWORD_FILE"]) as f:
-    db_pass = f.read()
-  if PRODUCTION: # NOTE: this only seems to happen in production
-    db_pass = db_pass[:-1] # remove new line character
-else:
-  raise Exception("No database password specified")
-app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{db_user}:{db_pass}@{db_host}/{db_name}"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["UPLOAD_DIR"] = "uploads"
-app.url_map.strict_slashes = False
-db = SQLAlchemy(app)
+dbs = db.get_session()
+
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+  dbs.remove()
+
 bcrypt = Bcrypt(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -68,10 +57,11 @@ redis_client = redis.StrictRedis(connection_pool=redis_pool)
 
 q = Queue(connection=redis_client)
 
-from app.models import *
+from lib.models import *
 
 @login_manager.user_loader
-def load_user(user_id): return User.query.get(user_id)
+def load_user(user_id):
+  return User.query.get(user_id)
 
 @login_manager.unauthorized_handler
 def unauthorized():
@@ -97,4 +87,6 @@ app.register_blueprint(auth)
 from app.platform import platform
 app.register_blueprint(platform)
 
-db.create_all()
+from lib.db import engine
+from lib.models.base import Base
+Base.metadata.create_all(engine)

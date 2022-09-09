@@ -1,7 +1,9 @@
 # Use an official Python runtime as a parent image
 FROM python:slim
 
-RUN apt-get update
+RUN apt-get update \
+    && apt-get -y install libpq-dev gcc \
+    && pip install psycopg2
 
 # install docker
 RUN apt-get install -y curl

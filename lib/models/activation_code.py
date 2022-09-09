@@ -1,5 +1,4 @@
-from app import db
-from app.models.base import Base
+from lib.models.base import Base
 
 
 class ActivationCode(Base):

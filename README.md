@@ -48,5 +48,8 @@ sudo docker exec -ti demo-db-1 psql -U postgres -d db
 ## Issues / TODO
 
 - [ ] Can we provide the docker image for the simulator on the registry, include it in the simulator
-      readme and also use it here?
+      readme and also use it here? https://docs.github.com/en/actions/publishing-packages/publishing-docker-images#publishing-images-to-docker-hub
 - [ ] Use https://github.com/docker/docker-py
+- [ ] Use custom.css to hide notebook header. Create custom buttons for restart and stop. (include
+      option for container as well)
+- [ ] Share/fork/view.

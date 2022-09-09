@@ -6,7 +6,7 @@ index a1ef3a6..bd808cc 100644
  
      <script src="https://unpkg.com/konva@8/konva.min.js"></script>
  
--    <link href="./main.css" rel="stylesheet"></link>
+-    <link href="./main.css" rel="stylesheet" />
 +    <link href="/simulator/main.css" rel="stylesheet"></link>
    </head>
    <body>

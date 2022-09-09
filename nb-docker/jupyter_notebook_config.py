@@ -9,7 +9,7 @@ c.NotebookApp.allow_origin = '*'
 # trick notebook into thinking flask is the jupyter server
 c.NotebookApp.base_url = '/notebook/'
 
-c.NotebookApp.custom_display_url = 'http://localhost:5001/'
+#c.NotebookApp.custom_display_url = 'http://localhost:5001/'
 
 # with https:
 # Content-Security-Policy “default-src https: ‘unsafe-inline’; connect-src https: wss:”

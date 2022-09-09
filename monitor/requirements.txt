@@ -1,2 +1,4 @@
+psycopg2==2.9.3
 redis==4.3.4
 rq==1.11.0
+SQLAlchemy==1.4.39

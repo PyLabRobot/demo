@@ -7,8 +7,8 @@ from flask_login import current_user, login_required
 import sqlalchemy
 from werkzeug.utils import secure_filename
 
-from app import db
-from app.models import File, Project
+from app import dbs
+from lib.models import File, Project
 
 platform = Blueprint("platform", __name__, url_prefix="/platform", template_folder="templates", static_folder="static")
 
@@ -26,10 +26,10 @@ def create_project():
   project = Project(name=name, owner_id=current_user.id)
 
   try:
-    db.session.add(project)
-    db.session.commit()
+    dbs.add(project)
+    dbs.commit()
   except Exception as e:
-    db.session.rollback()
+    dbs.rollback()
     current_app.logger.error(e)
     return jsonify({"error": "Could not create project"}), 500
 
@@ -107,11 +107,11 @@ def create_files():
     path = store_file(file, project_id)
     f.path = path
     try:
-      db.session.add(f)
-      db.session.commit()
+      dbs.add(f)
+      dbs.commit()
       file_objects.append(f)
     except Exception as e:
-      db.session.rollback()
+      dbs.rollback()
       current_app.logger.error(e)
       return jsonify({"error": str(e)}), 500
 

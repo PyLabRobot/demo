@@ -66,6 +66,7 @@ services:
       dockerfile: ./worker/Dockerfile
     depends_on:
       - redis
+      - db
     deploy:
       mode: replicated
       replicas: 1
@@ -76,8 +77,14 @@ services:
     mem_reservation: 64m
     environment:
       REDIS_HOST: "redis"
+      DB_USER: "postgres"
+      DB_HOST: "db"
+      DB_NAME: "db"
+      DB_PASSWORD_FILE: /run/secrets/db_password
 
       PYTHONUNBUFFERED: 1
+    secrets:
+      - db_password
 
   monitor:
     build:
@@ -85,6 +92,7 @@ services:
       dockerfile: ./monitor/Dockerfile
     depends_on:
       - redis
+      - db
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -93,8 +101,14 @@ services:
     restart: always
     environment:
       REDIS_HOST: "redis"
+      DB_USER: "postgres"
+      DB_HOST: "db"
+      DB_NAME: "db"
+      DB_PASSWORD_FILE: /run/secrets/db_password
 
       PYTHONUNBUFFERED: 1
+    secrets:
+      - db_password
 
   nginx:
     platform: linux/amd64
