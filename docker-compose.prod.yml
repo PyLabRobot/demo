@@ -10,7 +10,21 @@ services:
       FLASK_ENV: "production"
       PRODUCTION: "1"
     ports: []
-    entrypoint: ["gunicorn", "--workers", "1", "--threads", "10", "--bind", ":5001", "wsgi:app", "--timeout", "90", "--worker-class", "gevent"]
+    entrypoint:
+      [
+        "gunicorn",
+        "--workers",
+        "1",
+        "--threads",
+        "10",
+        "--bind",
+        ":5001",
+        "wsgi:app",
+        "--timeout",
+        "90",
+        "--worker-class",
+        "gevent",
+      ]
 
   nginx:
     ports:
@@ -22,6 +36,14 @@ services:
       - html:/usr/share/nginx/html
       - certs:/etc/nginx/certs:ro
       - /var/run/docker.sock:/tmp/docker.sock:ro
+
+  monitor:
+    environment:
+      PRODUCTION: "1"
+
+  worker:
+    environment:
+      PRODUCTION: "1"
 
   acme-companion:
     image: nginxproxy/acme-companion
