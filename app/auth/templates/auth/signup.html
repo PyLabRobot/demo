@@ -1,6 +1,6 @@
 {% extends "layout.html" %} {% block content %}
 <div class="container sign-up" style="max-width: 800px">
-  <h1 class="my-3">Sign up for the PyHamilton Platform</h1>
+  <h1 class="my-3">Sign up for the PyLabRobot Platform</h1>
   <form action="{{ url_for('auth.signup') }}" method="post">
     {{ form.hidden_tag() }}
     <div class="row g-3 mb-3">
@@ -28,7 +28,7 @@
 
     <label for="basic-url" class="form-label">Username</label>
     <div class="input-group mb-3">
-      <span class="input-group-text"> phpm.pyhamilton.org/u/ </span>
+      <span class="input-group-text"> simulator.pylabrobot.org/u/ </span>
       {{ form.username(class_='form-control' + (" is-invalid" if
       form.username.errors else ""), placeholder='john-doe-is-great') }} {% if
       form.username.errors %} {% for error in form.username.errors %}
@@ -49,7 +49,7 @@
       {% endfor %} {% endif %}
 
       <small class="text-muted">
-        Request an activation code by contacting a PyHamilton team member.
+        Request an activation code by contacting a PyLabRobot team member.
       </small>
     </div>
 
