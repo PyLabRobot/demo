@@ -23,7 +23,6 @@
         <a class="navbar-brand" href="#"
           >PyLabRobot Platform <span style="color: red">(&alpha;)</span></a
         >
-        {% if current_user.is_authenticated %}
         <div class="ml-auto">
           <a
             href="https://docs.pylabrobot.org"
@@ -31,18 +30,27 @@
             target="_blank"
             >PyLabRobot Documentation</a
           >
+
+          <a
+            href="http://paypal.me/pylabrobot"
+            class="btn btn-sm btn-secondary"
+            target="_blank"
+            >Donate</a
+          >
+
           <a
             href="mailto:wierenga@media.mit.edu?subject=PyLabRobot%20Platform%20Feedback&body=session%20id%20{{ current_user.id }}"
             class="btn btn-sm btn-secondary"
             >Support</a
           >
 
+          {% if current_user.is_authenticated %}
           <span>
             Current user: {{ current_user.email }} &middot; Session:
             <span id="session-id">{{ session.id }}</span>
           </span>
+          {% endif %}
         </div>
-        {% endif %}
       </div>
     </nav>
 
