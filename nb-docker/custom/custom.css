@@ -2,3 +2,12 @@
   display: none !important;
 }
 
+
+#notebook-container {
+  box-shadow: none;
+}
+
+.notebook_app {
+  background-color: white;
+}
+
