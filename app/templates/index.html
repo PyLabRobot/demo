@@ -1,4 +1,40 @@
 {% extends "layout.html" %} {% block content %}
+
+<div id="first-time-window" style="display: none">
+  <div id="first-time-message">
+    <h1>Welcome to the PyLabRobot Platform!</h1>
+
+    <p>
+      PyLabRobot is currently in
+      <a
+        target="_blank"
+        href="https://en.wikipedia.org/wiki/Software_release_life_cycle#Alpha"
+        >Alpha</a
+      >. This means that you may encounter bugs and missing features, but also
+      that you have the opportunity to significantly influence the development
+      of the platform.
+    </p>
+
+    <p>
+      We'd really appreciate it if you share any unexpected behavior, errors and
+      feature requests by creating a post on the
+      <a
+        target="_blank"
+        href="https://forums.pylabrobot.org/c/pylabrobot-simulator/25"
+        >forum</a
+      >.
+    </p>
+
+    <p>Enjoy!</p>
+
+    <div id="first-time-buttons">
+      <button id="first-time-close" onclick="closeFirstTimeMessage();">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="row">
   <div class="col-6" id="notebook">
     <div class="text-center pt-5" id="notebook-not-loaded">

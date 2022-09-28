@@ -139,8 +139,56 @@ function heartbeat() {
   setTimeout(heartbeat, 5000);
 }
 
+var firstTimeMessage = document.getElementById("first-time-window");
+firstTimeMessage.onclick = function (event) {
+  if (event.target.id === "first-time-window") {
+    closeSettings();
+  }
+};
+var canCloseFirstTimeMessage = false;
+
+function openFirstTimeMessage() {
+  firstTimeMessage.style.display = "block";
+
+  // Wait 10 seconds before allowing the user to close the message
+  var waited = 0;
+  var interval;
+  const waitDuration = 10;
+
+  function updateWaiting() {
+    waited += 1;
+
+    if (waited >= waitDuration) {
+      canCloseFirstTimeMessage = true;
+      clearInterval(interval);
+    }
+
+    const button = document.getElementById("first-time-close");
+    button.textContent = `Close (${waitDuration - waited}s)`;
+    button.disabled = !canCloseFirstTimeMessage;
+  }
+
+  interval = setInterval(updateWaiting, 1000);
+  updateWaiting();
+}
+
+function closeFirstTimeMessage() {
+  if (canCloseFirstTimeMessage) {
+    firstTimeMessage.style.display = "none";
+    localStorage.setItem("shown-first-time-message", "true");
+  }
+}
+
+function displayFirstTimeMessageIfNecessary() {
+  if (localStorage.getItem("shown-first-time-message") === null) {
+    openFirstTimeMessage();
+  }
+}
+
 function start() {
   startMasterWebsocket();
+
+  displayFirstTimeMessageIfNecessary();
 }
 
 window.onload = start;
