@@ -82,6 +82,31 @@ function getSession() {
     });
 }
 
+var waitingOnUpdateRestart = false;
+function displayUpdateAvailable() {
+  const updateAvailable = document.getElementById("update-available");
+  updateAvailable.style.display = "block";
+  alert("An update is available. Please click the button in the top right.");
+}
+
+function hideUpdateAvailable() {
+  const updateAvailable = document.getElementById("update-available");
+  updateAvailable.style.display = "none";
+}
+
+function sendUpdateRequest(e) {
+  ws.send(
+    JSON.stringify({
+      event: "update",
+    })
+  );
+
+  e.target.disabled = true;
+
+  document.getElementById("update-loader").style.display = "block";
+  waitingOnUpdateRestart = true;
+}
+
 function startMasterWebsocket() {
   const url = config["master_websocket_url"];
   ws = new WebSocket(url);
@@ -112,6 +137,14 @@ function startMasterWebsocket() {
       if (data.hasOwnProperty("simulator_url")) {
         loadSimulator(data.simulator_url);
         console.log("Loaded simulator");
+      }
+    } else if (data.type === "start-container") {
+      if (data.update_available === true) {
+        displayUpdateAvailable();
+      }
+
+      if (waitingOnUpdateRestart) {
+        hideUpdateAvailable();
       }
     } else if (data.type === "start-notebook") {
       loadNotebook(data.url);

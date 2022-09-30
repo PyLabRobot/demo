@@ -8,10 +8,10 @@ then
 fi
 
 cd PyLabRobot
-git pull
 git checkout .
+git pull
 git apply ../simulator.diff
 echo "Applied diff"
 cd ..
 
-docker image build -t nb-simple .
+docker image build -t nb-simple --platform linux/amd64 .

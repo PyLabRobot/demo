@@ -58,10 +58,7 @@
   <div class="col-6" id="simulator">
     <div class="text-center pt-5" id="simulator-not-loaded">
       <h2>Simulator not set up...</h2>
-      <p>
-        Run the Notebook on the left to start the simulator. Make sure the
-        logging level is at least <code>INFO</code>
-      </p>
+      <p>Run the Notebook on the left to start the simulator.</p>
     </div>
   </div>
 </div>
@@ -73,5 +70,5 @@
     master_websocket_url: "{{ master_web_socket_url }}",
   };
 </script>
-<script src="{{ url_for('static', filename='main.js') }}"></script>
+<script src="{{ url_for('static', filename='main.js') }}?t={{ range(0, 9999999999999) | random }}"></script>
 {% endblock %}

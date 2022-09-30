@@ -10,6 +10,7 @@ import urllib
 from flask import request, jsonify, session, url_for, redirect, Response, Blueprint, render_template
 from flask_login import current_user, login_required
 from lib.events import (
+  CONTAINER_STARTED,
   NOTEBOOK_STARTED,
   NOTEBOOK_STOPPED,
   SIMULATION_FILE_SERVER_STARTED,
@@ -35,7 +36,8 @@ from lib import (
   run_pod,
   get_pubsub_channel_name,
   PRINT,
-  PRODUCTION
+  PRODUCTION,
+  update_container
 )
 import lib.cache as cache
 
@@ -181,6 +183,8 @@ def master(ws):
         ws.send(json.dumps(d))
       elif message.get("event") == "ping":
         ws.send(json.dumps({ "event": "pong" }))
+      elif message.get("event") == "update":
+        q.enqueue_call(update_container, args=(sid,))
 
     # Listen for messages on the pubsub channel.
     message = p.get_message() # also non-blocking
@@ -195,6 +199,11 @@ def master(ws):
         if event == NOTEBOOK_STARTED:
           iframe_url = "/notebook/notebooks/notebook.ipynb"
           ws.send(json.dumps({"type": "start-notebook", "url": iframe_url}))
+        elif event == CONTAINER_STARTED:
+          update_available = data.get("update_available", False)
+          ws.send(json.dumps({
+            "type": "start-container",
+            "update_available": update_available}))
         elif event == NOTEBOOK_STOPPED:
           ws.send(json.dumps({"type": "stop-notebook"}))
         elif event == SIMULATION_FILE_SERVER_STARTED:

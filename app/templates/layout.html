@@ -18,39 +18,75 @@
     {% block head %} {% endblock %}
   </head>
   <body>
-    <nav class="navbar bg-light border-bottom">
+    <nav class="navbar bg-light border-bottom navbar-expand">
       <div class="container-fluid">
         <a class="navbar-brand" href="#"
           >PyLabRobot Platform <span style="color: red">(&alpha;)</span></a
         >
-        <div class="ml-auto">
-          <a
-            href="https://docs.pylabrobot.org"
-            class="btn btn-sm btn-primary"
-            target="_blank"
-            >PyLabRobot Documentation</a
-          >
 
-          <a
-            href="http://paypal.me/pylabrobot"
-            class="btn btn-sm btn-secondary"
-            target="_blank"
-            >Donate</a
-          >
-
-          <a
-            href="mailto:wierenga@media.mit.edu?subject=PyLabRobot%20Platform%20Feedback&body=session%20id%20{{ current_user.id }}"
-            class="btn btn-sm btn-secondary"
-            >Support</a
-          >
-
+        <ul class="navbar-nav">
           {% if current_user.is_authenticated %}
-          <span>
-            Current user: {{ current_user.email }} &middot; Session:
-            <span id="session-id">{{ session.id }}</span>
-          </span>
+          <li class="nav-item dropdown">
+            <a
+              class="nav-link dropdown-toggle"
+              href="#"
+              role="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              Account: {{ current_user.email }}
+            </a>
+            <ul class="dropdown-menu">
+              <li>Current user: {{ current_user.email }}</li>
+              <li>
+                Session:
+                <span id="session-id">{{ session.id }}</span>
+              </li>
+            </ul>
+          </li>
+          {% endif %} {% if current_user.can_demo %}
+          <li class="nav-item" id="update-available" style="display: none">
+            <button
+              class="btn btn-danger me-2"
+              onclick="sendUpdateRequest(event)"
+            >
+              <div
+                class="loader"
+                id="update-loader"
+                style="display: none"
+              ></div>
+
+              Update and restart simulator
+            </button>
+          </li>
           {% endif %}
-        </div>
+
+          <li class="nav-item">
+            <a
+              href="https://docs.pylabrobot.org"
+              class="btn btn-sm btn-primary me-2"
+              target="_blank"
+              >PyLabRobot Documentation</a
+            >
+          </li>
+
+          <li class="nav-item">
+            <a
+              href="http://paypal.me/pylabrobot"
+              class="btn btn-sm btn-secondary me-2"
+              target="_blank"
+              >Donate</a
+            >
+          </li>
+
+          <li class="nav-item">
+            <a
+              href="mailto:wierenga@media.mit.edu?subject=PyLabRobot%20Platform%20Feedback&body=session%20id%20{{ current_user.id }}"
+              class="btn btn-sm btn-secondary"
+              >Support</a
+            >
+          </li>
+        </ul>
       </div>
     </nav>
 

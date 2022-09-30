@@ -1,4 +1,3 @@
-from audioop import getsample
 import sys
 from app import ActivationCode
 from lib.db import get_session

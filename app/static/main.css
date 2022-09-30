@@ -13,6 +13,14 @@ iframe {
   width: 100%;
 }
 
+.navbar-nav {
+  align-items: center;
+}
+
+.dropdown-menu {
+  width: 400px;
+}
+
 /***** spinner *****/
 
 .lds-ellipsis {
@@ -68,6 +76,25 @@ iframe {
   }
   100% {
     transform: translate(24px, 0);
+  }
+}
+
+/* https://www.w3schools.com/howto/howto_css_loader.asp */
+.loader {
+  border: 2px solid #f3f3f3; /* Light grey */
+  border-top: 2px solid black; /* Blue */
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 

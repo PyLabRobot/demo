@@ -44,6 +44,9 @@ def main():
       elif event.get("Action") == "stop" or event.get("Action") == "die":
         print("M"*10, "container stopped:", uid)
         lib.handle_container_stopped(redis_client, session, uid)
+      elif event.get("Action") == "destroy":
+        print("M"*10, "container destroyed:", uid)
+        lib.handle_container_destroyed(redis_client, session, uid)
 
 
 if __name__ == "__main__":
