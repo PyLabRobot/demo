@@ -7,7 +7,7 @@ COPY --chown=root:root jupyter_notebook_config.py jupyter_notebook_config.py
 
 USER ${NB_UID}
 COPY --chown=jovyan:users PyLabRobot pylabrobot
-RUN cd pylabrobot && pip install -e '.[simulation]'
+RUN cd pylabrobot && pip install -e '.[simulation,opentrons]'
 
 COPY --chown=jovyan:users template.ipynb ./notebooks/notebook.ipynb
 # need to copy a migrated file so it's owned by jovyan, otherwise jupyter will not be able to access it.
