@@ -45,6 +45,12 @@ sudo docker exec -ti demo-db-1 psql -U postgres -d db
 ./build.sh
 ```
 
+### See who logged in in the past x hours
+
+```sh
+sudo docker exec -it demo-db-1 psql -U postgres -d db -c "select events.id, events.created_on, events.code, users.id, users.email from events inner join users on events.uid = users.id where events.created_on > (NOW() - INTERVAL '15 hours' ) order by events.created_on;"
+```
+
 ## Issues / TODO
 
 - [ ] Can we provide the docker image for the simulator on the registry, include it in the simulator
